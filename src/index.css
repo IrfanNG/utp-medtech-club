@@ -1085,8 +1085,9 @@ h1, h2, h3, h4 {
   overflow: hidden;
 }
 .about-hero-bg .hero-bg-img {
-  opacity: 0.34;
-  filter: grayscale(0.3) contrast(1.05);
+  object-position: center center;
+  opacity: 0.42;
+  filter: grayscale(0.12) contrast(1.08);
 }
 .about-hero-content {
   position: relative;
