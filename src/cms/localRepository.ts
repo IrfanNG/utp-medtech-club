@@ -60,31 +60,9 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-/* ---------- Analytics mock ---------- */
-
-function genSeries(): { date: string; views: number; visitors: number }[] {
-  const days = 30;
-  const out: { date: string; views: number; visitors: number }[] = [];
-  const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const base = 120 + Math.sin(i / 3) * 60;
-    const views = Math.round(base + Math.random() * 80);
-    const visitors = Math.round(views * (0.5 + Math.random() * 0.2));
-    out.push({
-      date: d.toISOString().slice(0, 10),
-      views,
-      visitors,
-    });
-  }
-  return out;
-}
-
 /* ---------- Repository ---------- */
 
 export class LocalRepository implements CmsRepository {
-  private seriesCache: { date: string; views: number; visitors: number }[] | null = null;
 
   constructor() {
     this.ensureSeed();
@@ -174,10 +152,6 @@ export class LocalRepository implements CmsRepository {
   }
 
   async getAnalytics(projects: CmsProject[], media: CmsMedia[]): Promise<AnalyticsSnapshot> {
-    if (!this.seriesCache) this.seriesCache = genSeries();
-    const series = this.seriesCache;
-    const totalViews = series.reduce((s, p) => s + p.views, 0);
-    const uniqueVisitors = series.reduce((s, p) => s + p.visitors, 0);
     const images = media.filter((m) => m.kind === "image").length;
     const videos = media.filter((m) => m.kind === "video").length;
     const published = projects.filter((p) => p.status === "published");
@@ -185,20 +159,16 @@ export class LocalRepository implements CmsRepository {
       .slice()
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 5);
-    const avgSec = 184 + Math.round(Math.random() * 60);
-    const m = Math.floor(avgSec / 60);
-    const s = avgSec % 60;
 
     return {
-      totalPageViews: totalViews,
-      totalVisitors: uniqueVisitors,
+      totalPageViews: 0,
+      totalVisits: 0,
       totalProjects: projects.length,
       totalImages: images,
       totalVideos: videos,
-      series,
-      totalViews,
-      uniqueVisitors,
-      avgSessionDuration: `${m}m ${s}s`,
+      series: [],
+      totalViews: 0,
+      uniqueVisits: 0,
       recentProjects: recent.map((p) => ({
         title: p.title,
         status: p.status,
@@ -211,6 +181,7 @@ export class LocalRepository implements CmsRepository {
         { label: "Published", value: published.length, color: "#ff1a0f" },
         { label: "Drafts", value: projects.length - published.length, color: "#e2e8f0" },
       ],
+      analyticsError: "Analytics unavailable in local mode",
     };
   }
 

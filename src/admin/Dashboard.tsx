@@ -4,6 +4,19 @@ import { AdminIcon } from "./AdminIcons";
 
 const dateRanges = ["7 Days", "30 Days", "90 Days", "1 Year"];
 
+function computeTrend(
+  series: { views: number; visits: number }[],
+  key: "views" | "visits",
+): { value: string; up: boolean } | null {
+  if (series.length < 2) return null;
+  const mid = Math.floor(series.length / 2);
+  const first = series.slice(0, mid).reduce((s, p) => s + p[key], 0);
+  const last = series.slice(mid).reduce((s, p) => s + p[key], 0);
+  if (first === 0) return null;
+  const pct = ((last - first) / first) * 100;
+  return { value: `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`, up: pct >= 0 };
+}
+
 export function Dashboard() {
   const { analytics, projects, activities } = useCms();
   const [range, setRange] = useState("30 Days");
@@ -14,6 +27,11 @@ export function Dashboard() {
     if (range === "90 Days") return all.slice(-90);
     return all;
   }, [analytics.series, range]);
+
+  const pageViewTrend = computeTrend(analytics.series, "views");
+  const visitsTrend = computeTrend(analytics.series, "visits");
+
+  const hasAnalytics = analytics.series.length > 0;
 
   return (
     <div className="adm-page">
@@ -38,40 +56,35 @@ export function Dashboard() {
         <KpiCard
           icon={AdminIcon.eye}
           label="Total Page Views"
-          value={analytics.totalPageViews.toLocaleString()}
-          trend="+12.4%"
-          trendUp
+          value={hasAnalytics ? analytics.totalPageViews.toLocaleString() : "N/A"}
+          trend={pageViewTrend?.value}
+          trendUp={pageViewTrend?.up}
           color="#ff1a0f"
         />
         <KpiCard
           icon={AdminIcon.users}
-          label="Total Visitors"
-          value={analytics.totalVisitors.toLocaleString()}
-          trend="+8.2%"
-          trendUp
+          label="Total Visits"
+          value={hasAnalytics ? analytics.totalVisits.toLocaleString() : "N/A"}
+          trend={visitsTrend?.value}
+          trendUp={visitsTrend?.up}
           color="#6366f1"
         />
         <KpiCard
           icon={AdminIcon.projects}
           label="Total Projects"
           value={String(analytics.totalProjects)}
-          trend="+3"
-          trendUp
           color="#0ea5e9"
         />
         <KpiCard
           icon={AdminIcon.image}
           label="Total Images"
           value={String(analytics.totalImages)}
-          trend="+2"
-          trendUp
           color="#22c55e"
         />
         <KpiCard
           icon={AdminIcon.video}
           label="Total Videos"
           value={String(analytics.totalVideos)}
-          trend="0"
           color="#f59e0b"
         />
       </div>
@@ -79,31 +92,41 @@ export function Dashboard() {
       {/* Analytics + Donut */}
       <div className="adm-row">
         <div className="adm-card adm-chart-card">
-          <div className="adm-card-head">
-            <div>
+          {analytics.analyticsError ? (
+            <div className="adm-card-head">
               <h3>Website Analytics</h3>
-              <p className="adm-card-sub">Page views and visitors over time</p>
+              <p className="adm-muted">{analytics.analyticsError}</p>
             </div>
-            <div className="adm-chart-legend">
-              <span><span className="adm-dot red" /> Views</span>
-              <span><span className="adm-dot blue" /> Visitors</span>
+          ) : hasAnalytics ? (
+            <>
+              <div className="adm-card-head">
+                <div>
+                  <h3>Website Analytics</h3>
+                  <p className="adm-card-sub">Page views and visits over time</p>
+                </div>
+                <div className="adm-chart-legend">
+                  <span><span className="adm-dot red" /> Views</span>
+                  <span><span className="adm-dot blue" /> Visits</span>
+                </div>
+              </div>
+              <div className="adm-chart-stats">
+                <div>
+                  <span className="adm-chart-stat-val">{analytics.totalViews.toLocaleString()}</span>
+                  <span className="adm-chart-stat-label">Views</span>
+                </div>
+                <div>
+                  <span className="adm-chart-stat-val">{analytics.uniqueVisits.toLocaleString()}</span>
+                  <span className="adm-chart-stat-label">Unique Visits</span>
+                </div>
+              </div>
+              <LineChart data={chartData} />
+            </>
+          ) : (
+            <div className="adm-card-head">
+              <h3>Website Analytics</h3>
+              <p className="adm-muted">No analytics data yet. Data appears within 24 hours of enabling Cloudflare Web Analytics.</p>
             </div>
-          </div>
-          <div className="adm-chart-stats">
-            <div>
-              <span className="adm-chart-stat-val">{analytics.totalViews.toLocaleString()}</span>
-              <span className="adm-chart-stat-label">Total Views</span>
-            </div>
-            <div>
-              <span className="adm-chart-stat-val">{analytics.uniqueVisitors.toLocaleString()}</span>
-              <span className="adm-chart-stat-label">Unique Visitors</span>
-            </div>
-            <div>
-              <span className="adm-chart-stat-val">{analytics.avgSessionDuration}</span>
-              <span className="adm-chart-stat-label">Avg. Session</span>
-            </div>
-          </div>
-          <LineChart data={chartData} />
+          )}
         </div>
 
         <div className="adm-card adm-donut-card">
@@ -206,8 +229,8 @@ function KpiCard({
   icon: (p: { size?: number }) => React.ReactNode;
   label: string;
   value: string;
-  trend: string;
-  trendUp?: boolean;
+  trend?: string | null;
+  trendUp?: boolean | null;
   color: string;
 }) {
   return (
@@ -216,7 +239,9 @@ function KpiCard({
         <div className="adm-kpi-icon" style={{ background: `${color}18`, color }}>
           <Icon size={22} />
         </div>
-        <span className={`adm-kpi-trend ${trendUp ? "up" : ""}`}>{trend}</span>
+        {trend != null && (
+          <span className={`adm-kpi-trend ${trendUp ? "up" : ""}`}>{trend}</span>
+        )}
       </div>
       <div className="adm-kpi-value">{value}</div>
       <div className="adm-kpi-label">{label}</div>
@@ -226,18 +251,18 @@ function KpiCard({
 
 /* ---------- Line Chart ---------- */
 
-function LineChart({ data }: { data: { date: string; views: number; visitors: number }[] }) {
+function LineChart({ data }: { data: { date: string; views: number; visits: number }[] }) {
   const w = 640;
   const h = 200;
   const pad = { top: 10, right: 10, bottom: 24, left: 36 };
   const cw = w - pad.left - pad.right;
   const ch = h - pad.top - pad.bottom;
 
-  const max = Math.max(...data.flatMap((d) => [d.views, d.visitors]), 10);
+  const max = Math.max(...data.flatMap((d) => [d.views, d.visits]), 10);
   const xStep = data.length > 1 ? cw / (data.length - 1) : cw;
   const yScale = (v: number) => pad.top + ch - (v / max) * ch;
 
-  const toPath = (key: "views" | "visitors") =>
+  const toPath = (key: "views" | "visits") =>
     data.map((d, i) => `${i === 0 ? "M" : "L"} ${pad.left + i * xStep} ${yScale(d[key])}`).join(" ");
 
   const gridLines = [0, 0.25, 0.5, 0.75, 1].map((f) => pad.top + ch * f);
@@ -254,7 +279,7 @@ function LineChart({ data }: { data: { date: string; views: number; visitors: nu
         ))}
         <path d={toPath("views")} className="adm-chart-line views" />
         <path d={toPath("views")} className="adm-chart-area views" />
-        <path d={toPath("visitors")} className="adm-chart-line visitors" />
+        <path d={toPath("visits")} className="adm-chart-line visitors" />
         {data.map((d, i) => (
           <circle key={i} cx={pad.left + i * xStep} cy={yScale(d.views)} r="2.5" className="adm-chart-dot views" />
         ))}

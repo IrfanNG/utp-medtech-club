@@ -344,14 +344,13 @@ export function useCms(): CmsContextValue {
 function defaultAnalytics(): AnalyticsSnapshot {
   return {
     totalPageViews: 0,
-    totalVisitors: 0,
+    totalVisits: 0,
     totalProjects: 0,
     totalImages: 0,
     totalVideos: 0,
     series: [],
     totalViews: 0,
-    uniqueVisitors: 0,
-    avgSessionDuration: "0m 0s",
+    uniqueVisits: 0,
     recentProjects: [],
     contentOverview: [],
   };

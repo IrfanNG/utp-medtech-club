@@ -56,7 +56,7 @@ export interface SiteSettings {
 export interface AnalyticsPoint {
   date: string;
   views: number;
-  visitors: number;
+  visits: number;
 }
 
 export interface ContentSlice {
@@ -74,16 +74,16 @@ export interface ActivityEntry {
 
 export interface AnalyticsSnapshot {
   totalPageViews: number;
-  totalVisitors: number;
+  totalVisits: number;
   totalProjects: number;
   totalImages: number;
   totalVideos: number;
   series: AnalyticsPoint[];
   totalViews: number;
-  uniqueVisitors: number;
-  avgSessionDuration: string;
+  uniqueVisits: number;
   recentProjects: { title: string; status: string; date: string }[];
   contentOverview: ContentSlice[];
+  analyticsError?: string;
 }
 
 export interface AdminSession {

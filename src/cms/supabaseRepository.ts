@@ -12,33 +12,11 @@ import type {
 import type { CmsRepository, UploadResult } from "./repository";
 import { mapProject, mapClient, mapMedia } from "./mappers";
 
-/* ---------- Analytics mock (unchanged) ---------- */
-
-function genSeries(): { date: string; views: number; visitors: number }[] {
-  const days = 30;
-  const out: { date: string; views: number; visitors: number }[] = [];
-  const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const base = 120 + Math.sin(i / 3) * 60;
-    const views = Math.round(base + Math.random() * 80);
-    const visitors = Math.round(views * (0.5 + Math.random() * 0.2));
-    out.push({
-      date: d.toISOString().slice(0, 10),
-      views,
-      visitors,
-    });
-  }
-  return out;
-}
-
 type Row = Record<string, unknown>;
 
 /* ---------- Repository ---------- */
 
 export class SupabaseRepository implements CmsRepository {
-  private seriesCache: { date: string; views: number; visitors: number }[] | null = null;
 
   /* ---- Projects ---- */
 
@@ -329,14 +307,24 @@ export class SupabaseRepository implements CmsRepository {
 
   /* ---- Analytics ---- */
 
-  private async fetchSeries(): Promise<AnalyticsPoint[]> {
+  private async fetchSeries(): Promise<{ series: AnalyticsPoint[]; error?: string }> {
     try {
-      const res = await fetch("/api/analytics");
-      if (!res.ok) return [];
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      const res = await fetch("/api/analytics", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.status === 503) {
+        return { series: [], error: "Cloudflare analytics not configured. Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_TAG in Pages env vars." };
+      }
+      if (!res.ok) {
+        const body = (await res.json()) as { error?: string };
+        return { series: [], error: body.error ?? `API error (${res.status})` };
+      }
       const body = (await res.json()) as { series?: AnalyticsPoint[] };
-      return body.series ?? [];
-    } catch {
-      return [];
+      return { series: body.series ?? [] };
+    } catch (err) {
+      return { series: [], error: String(err) };
     }
   }
 
@@ -344,14 +332,10 @@ export class SupabaseRepository implements CmsRepository {
     projects: CmsProject[],
     media: CmsMedia[],
   ): Promise<AnalyticsSnapshot> {
-    const series = await this.fetchSeries();
-    if (series.length === 0) {
-      if (!this.seriesCache) this.seriesCache = genSeries();
-      series.push(...this.seriesCache);
-    }
+    const { series, error } = await this.fetchSeries();
 
     const totalViews = series.reduce((s, p) => s + p.views, 0);
-    const uniqueVisitors = series.reduce((s, p) => s + p.visitors, 0);
+    const uniqueVisits = series.reduce((s, p) => s + p.visits, 0);
     const images = media.filter((m) => m.kind === "image").length;
     const videos = media.filter((m) => m.kind === "video").length;
     const published = projects.filter((p) => p.status === "published");
@@ -359,20 +343,16 @@ export class SupabaseRepository implements CmsRepository {
       .slice()
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 5);
-    const avgSec = 184 + Math.round(Math.random() * 60);
-    const avgM = Math.floor(avgSec / 60);
-    const avgS = avgSec % 60;
 
     return {
       totalPageViews: totalViews,
-      totalVisitors: uniqueVisitors,
+      totalVisits: uniqueVisits,
       totalProjects: projects.length,
       totalImages: images,
       totalVideos: videos,
       series,
       totalViews,
-      uniqueVisitors,
-      avgSessionDuration: `${avgM}m ${avgS}s`,
+      uniqueVisits,
       recentProjects: recent.map((p) => ({
         title: p.title,
         status: p.status,
@@ -385,6 +365,7 @@ export class SupabaseRepository implements CmsRepository {
         { label: "Published", value: published.length, color: "#ff1a0f" },
         { label: "Drafts", value: projects.length - published.length, color: "#e2e8f0" },
       ],
+      analyticsError: error || (series.length === 0 ? "No analytics data available yet. Data appears within 24 hours of enabling Cloudflare Web Analytics." : undefined),
     };
   }
 
