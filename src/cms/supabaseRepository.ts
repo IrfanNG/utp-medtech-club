@@ -326,7 +326,7 @@ export class SupabaseRepository implements CmsRepository {
       }
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
-        return { series: [], error: body.error ?? `API error (${res.status})` };
+        return { series: [], error: body.error || `Analytics error (${res.status})` };
       }
       const body = (await res.json()) as { series?: AnalyticsPoint[] };
       return { series: body.series ?? [] };

@@ -102,14 +102,14 @@ export async function onRequest(context: {
     query {
       viewer {
         accounts(filter: {accountTag: "${accountTag}"}) {
-          rumPageloadsAdaptiveGroups(
+          rumPageloadEventsAdaptiveGroups(
             limit: 30
-            filter: {date_gt: "${daysAgo(31)}", host: ["${hostname}"]}
+            filter: {date_gt: "${daysAgo(31)}", requestHost: "${hostname}"}
             orderBy: [date_DESC]
           ) {
             dimensions { date }
-            sum { pageViews }
-            uniq { uniques }
+            count
+            sum { visits }
           }
         }
       }
@@ -129,8 +129,11 @@ export async function onRequest(context: {
     const body = (await res.json()) as Record<string, unknown>;
 
     if (!res.ok || body.errors) {
+      const msgs = (body.errors as { message: string }[] | null)
+        ?.map((e) => e.message)
+        .join("; ");
       return new Response(
-        JSON.stringify({ error: "CF API error", detail: body }),
+        JSON.stringify({ error: msgs || "Cloudflare analytics error" }),
         { status: 502, headers },
       );
     }
@@ -138,26 +141,26 @@ export async function onRequest(context: {
     const groups =
       (
         body as Record<string, unknown>
-      )?.data?.viewer?.accounts?.[0]?.rumPageloadsAdaptiveGroups ?? [];
+      )?.data?.viewer?.accounts?.[0]?.rumPageloadEventsAdaptiveGroups ?? [];
 
     const series = (
       groups as {
         dimensions: { date: string };
-        sum: { pageViews: number };
-        uniq: { uniques: number };
+        count: number;
+        sum: { visits: number };
       }[]
     )
       .reverse()
       .map((g) => ({
         date: g.dimensions.date,
-        views: g.sum.pageViews,
-        visits: g.uniq.uniques,
+        views: g.count,
+        visits: g.sum.visits,
       }));
 
     return new Response(JSON.stringify({ series }), { status: 200, headers });
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: "Failed to fetch analytics", detail: String(err) }),
+      JSON.stringify({ error: "Cloudflare analytics request failed" }),
       { status: 502, headers },
     );
   }
