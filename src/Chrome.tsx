@@ -3,10 +3,9 @@ import {
   delayStyle,
   Icon,
   navLinks,
-  services,
-  social,
   SocialGlyph,
 } from "./shared";
+import { useCms } from "./cms/CmsContext";
 
 export function Header({ activePath = "/" }: { activePath?: string }) {
   const [scrolled, setScrolled] = useState(false);
@@ -65,10 +64,24 @@ export function Header({ activePath = "/" }: { activePath?: string }) {
   );
 }
 
+function buildSocial(settings: {
+  instagramUrl: string;
+  linkedinUrl: string;
+  youtubeUrl: string;
+}) {
+  return [
+    { icon: Icon.instagram, label: "Instagram", url: settings.instagramUrl },
+    { icon: Icon.linkedin, label: "LinkedIn", url: settings.linkedinUrl },
+    { icon: Icon.youtube, label: "YouTube", url: settings.youtubeUrl },
+  ].filter((s) => s.url.trim() !== "");
+}
+
 export function SideRail() {
+  const { settings } = useCms();
+  const socialItems = buildSocial(settings);
   return (
     <div className="social-rail">
-      {social.map((s) => (
+      {socialItems.map((s) => (
         <a key={s.label} href={s.url} target="_blank" rel="noreferrer" aria-label={s.label}>
           <SocialGlyph paths={s.icon} />
         </a>
@@ -78,20 +91,22 @@ export function SideRail() {
 }
 
 export function Footer() {
+  const { settings } = useCms();
+  const socialItems = buildSocial(settings);
   return (
     <footer id="contact" className="footer">
       <div className="container">
         <div className="footer-grid">
           <div className="footer-brand" data-reveal>
             <div className="logo">
-              <img src="/medtech-logo.avif" alt="UTP Medtech Club" className="logo-img" />
+              <img src="/medtech-logo.avif" alt={settings.title} className="logo-img" />
             </div>
             <p>
               We are a multimedia and event production team committed to capturing
               moments, creating impact, and delivering excellence.
             </p>
             <div className="footer-socials">
-              {social.map((s) => (
+              {socialItems.map((s) => (
                 <a key={s.label} href={s.url} target="_blank" rel="noreferrer" aria-label={s.label}>
                   <SocialGlyph paths={s.icon} />
                 </a>
@@ -106,7 +121,7 @@ export function Footer() {
           </div>
           <div className="footer-col" data-reveal style={delayStyle(160)}>
             <h4>Services</h4>
-            {services.map((s) => (
+            {footerServices().map((s) => (
               <a key={s.title} href="#/#services">{s.title}</a>
             ))}
           </div>
@@ -115,11 +130,11 @@ export function Footer() {
             <div className="contact-row">
               <div>
                 <span className="label">Email</span>
-                <a href="mailto:hello@utpmedtech.my">hello@utpmedtech.my</a>
+                <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
               </div>
               <div>
                 <span className="label">Phone</span>
-                <a href="tel:+60300000000">+60 3 0000 0000</a>
+                <a href={`tel:${settings.phone.replace(/\s/g, "")}`}>{settings.phone}</a>
               </div>
               <div>
                 <span className="label">Working Hours</span>
@@ -129,12 +144,22 @@ export function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} UTP Medtech Club. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} {settings.title}. All rights reserved.</span>
           <span>Crafted for cinematic storytelling.</span>
         </div>
       </div>
     </footer>
   );
+}
+
+function footerServices() {
+  return [
+    { title: "Photography Services" },
+    { title: "Videography Services" },
+    { title: "Technical Services" },
+    { title: "Design Services" },
+    { title: "Website Services" },
+  ];
 }
 
 export { Icon };

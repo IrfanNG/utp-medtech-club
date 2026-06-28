@@ -4,13 +4,14 @@ import About from "./About";
 import Contact from "./Contact";
 import Portfolio from "./Portfolio";
 import Home from "./Home";
+import { AdminApp } from "./admin/AdminApp";
 
 export default function App() {
   const route = useHashRoute();
   useReveal(route.path + route.anchor);
 
   useEffect(() => {
-    if (route.anchor) {
+    if (route.anchor && !route.path.startsWith("/admin")) {
       const el = document.getElementById(route.anchor);
       if (el) {
         requestAnimationFrame(() => {
@@ -19,6 +20,10 @@ export default function App() {
       }
     }
   }, [route.path, route.anchor]);
+
+  if (route.path.startsWith("/admin")) {
+    return <AdminApp path={route.path} />;
+  }
 
   if (route.path === "/about") {
     return <About />;

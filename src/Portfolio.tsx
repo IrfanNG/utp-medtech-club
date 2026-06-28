@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import {
   Icon,
-  clients,
   delayStyle,
   reveal,
   SocialGlyph,
   usePageTitle,
 } from "./shared";
 import { Footer, Header } from "./Chrome";
+import { useCms } from "./cms/CmsContext";
 
 const categories = [
   "All Projects",
@@ -20,17 +20,6 @@ const categories = [
   "Behind The Scenes",
 ];
 
-const projects = [
-  { title: "UTP Convocation Ceremony 2024", category: "Convocation", year: "2024", img: "/media/about/oweek-may-25.jpg", alt: "Graduation ceremony crowd in a hall" },
-  { title: "Sukmer Representative Council Summit 2024", category: "Corporate", year: "2024", img: "/media/about/sukmed-24.jpg", alt: "Sukmed summit event activities" },
-  { title: "Kembara Raya Community Program 2024", category: "Community", year: "2024", img: "/media/about/kembara-raya-24.jpg", alt: "Kembara Raya community road trip" },
-  { title: "Sony Videography Workshop", category: "Workshop", year: "2024", img: "/media/about/sony-workshop.jpg", alt: "Sony camera workshop session" },
-  { title: "Kaki Photo 2025", category: "Community", year: "2025", img: "/media/about/kaki-photo-2025.jpg", alt: "Kaki Photo 2025 meetup" },
-  { title: "SEA Awards 2024", category: "Festival", year: "2024", img: "/media/about/sea-awards-2024.jpg", alt: "SEA Awards 2024 ceremony" },
-  { title: "Cybergen 2025", category: "Workshop", year: "2025", img: "/media/about/cybergen-2025.jpg", alt: "Cybergen 2025 event" },
-  { title: "Brother & Sister 2.0", category: "Live Streaming", year: "2024", img: "/media/about/brother-sister-2.jpg", alt: "Brother and Sister 2.0 programme" },
-];
-
 const showreelThumbs = [
   { img: "/media/project-1.jpg", alt: "Corporate conference audience" },
   { img: "/media/project-2.jpg", alt: "Graduation ceremony crowd" },
@@ -38,7 +27,8 @@ const showreelThumbs = [
 ];
 
 export default function Portfolio() {
-  usePageTitle("Portfolio — UTP Medtech Club");
+  const { settings } = useCms();
+  usePageTitle(`Portfolio — ${settings.title}`);
   return (
     <div className="app">
       <Header activePath="/portfolio" />
@@ -49,12 +39,13 @@ export default function Portfolio() {
 }
 
 function PortfolioContent() {
+  const { publishedProjects, publishedClients } = useCms();
   const [activeFilter, setActiveFilter] = useState("All Projects");
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return projects.filter((p) => {
+    return publishedProjects.filter((p) => {
       const catOk = activeFilter === "All Projects" || p.category === activeFilter;
       const qOk =
         q === "" ||
@@ -63,7 +54,7 @@ function PortfolioContent() {
         p.year.includes(q);
       return catOk && qOk;
     });
-  }, [activeFilter, query]);
+  }, [publishedProjects, activeFilter, query]);
 
   return (
     <>
@@ -156,9 +147,9 @@ function PortfolioContent() {
           ) : (
             <div className="portfolio-grid">
               {filtered.map((p, i) => (
-                <div className="pfolio-card" key={p.title} {...reveal} style={delayStyle(i * 80)}>
+                <div className="pfolio-card" key={p.id} {...reveal} style={delayStyle(i * 80)}>
                   <div className="pfolio-card-img">
-                    <img src={p.img} alt={p.alt} loading="lazy" className="card-img" />
+                    <img src={p.coverUrl} alt={p.alt} loading="lazy" className="card-img" />
                     <div className="pfolio-card-overlay" />
                     <span className="pfolio-card-arrow">↗</span>
                   </div>
@@ -215,9 +206,9 @@ function PortfolioContent() {
               <SocialGlyph paths={Icon.chevronLeft} />
             </button>
             <div className="clients-logos">
-              {clients.map((c) => (
-                <div className="client-circle" key={c}>
-                  <span>{c.slice(0, 2)}</span>
+              {publishedClients.map((c) => (
+                <div className="client-circle" key={c.id}>
+                  <span>{c.name.slice(0, 2)}</span>
                 </div>
               ))}
             </div>

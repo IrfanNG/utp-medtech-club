@@ -1,10 +1,8 @@
 import {
-  clients,
   ctaImg,
   delayStyle,
   features,
   heroImg,
-  projects,
   reveal,
   services,
   stats,
@@ -13,9 +11,11 @@ import {
   usePageTitle,
 } from "./shared";
 import { Footer, Header, SideRail } from "./Chrome";
+import { useCms } from "./cms/CmsContext";
 
 export default function Home() {
-  usePageTitle("UTP Medtech Club");
+  const { settings } = useCms();
+  usePageTitle(settings.title);
   return (
     <div className="app">
       <Header activePath="/" />
@@ -26,6 +26,9 @@ export default function Home() {
 }
 
 function HomeContent() {
+  const { publishedClients, publishedProjects } = useCms();
+  const featuredProjects = publishedProjects.filter((p) => p.featured).slice(0, 3);
+  const cmsClients = publishedClients.map((c) => c.name);
   return (
     <>
       {/* Hero */}
@@ -58,7 +61,7 @@ function HomeContent() {
         <div className="container" {...reveal}>
           <p>Trusted by leading organizations</p>
           <div className="logos">
-            {clients.map((c) => (
+            {cmsClients.map((c) => (
               <span key={c}>{c}</span>
             ))}
           </div>
@@ -106,12 +109,12 @@ function HomeContent() {
             <h2 className="section-title">Featured Projects</h2>
           </div>
           <div className="projects-grid">
-            {projects.map((p, i) => (
-              <div className="project-card" key={p.title} {...reveal} style={delayStyle(i * 100)}>
-                <img src={p.img} alt={p.alt} loading="lazy" className="card-img project-img-fill" />
+            {featuredProjects.map((p, i) => (
+              <div className="project-card" key={p.id} {...reveal} style={delayStyle(i * 100)}>
+                <img src={p.coverUrl} alt={p.alt} loading="lazy" className="card-img project-img-fill" />
                 <div className="project-overlay" />
                 <div className="project-info">
-                  <div className="project-tag">{p.tag}</div>
+                  <div className="project-tag">{p.category}</div>
                   <h3>{p.title}</h3>
                   <a href="#/portfolio" className="project-link">
                     View Project <span>→</span>
