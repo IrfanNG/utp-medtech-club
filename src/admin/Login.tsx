@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
+import { supabase } from "../lib/supabase";
 import { useCms } from "../cms/CmsContext";
 import { usePageTitle } from "../shared";
 
-const DEMO_EMAIL = "admin@utpmedtech.club";
-const DEMO_PASSWORD = "medtech-demo";
+const ADMIN_EMAIL = "admin@utpmedtech.club";
 
 export function AdminLogin() {
   usePageTitle("Admin Login — UTP Medtech Club");
@@ -13,32 +13,139 @@ export function AdminLogin() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [forgotMsg, setForgotMsg] = useState(false);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  /* Password reset state */
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    setTimeout(() => {
-      const ok = login(email, password);
-      if (!ok) {
-        setError("Invalid email or password. Use the demo credentials below.");
-        setLoading(false);
-      } else {
+    try {
+      const ok = await login(email, password);
+      if (ok) {
         window.location.hash = "#/admin";
+      } else {
+        setError("Invalid email or password, or you do not have admin access.");
       }
-    }, 400);
+    } catch {
+      setError("An error occurred during sign in.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setError("");
+    try {
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+        resetEmail.trim().toLowerCase(),
+        { redirectTo: `${window.location.origin}/#/admin/reset-password` },
+      );
+      if (resetErr) {
+        setError(resetErr.message);
+      } else {
+        setResetSent(true);
+      }
+    } catch {
+      setError("Failed to send reset email.");
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   const fillDemo = () => {
-    setEmail(DEMO_EMAIL);
-    setPassword(DEMO_PASSWORD);
+    setEmail(ADMIN_EMAIL);
+    setPassword("");
     setError("");
   };
 
+  if (resetMode) {
+    return (
+      <div className="adm-login-page">
+        <div className="adm-login-left">
+          <img
+            src="/media/portfolio/portfolio-hero.jpg"
+            alt=""
+            className="adm-login-bg-img"
+          />
+          <div className="adm-login-left-overlay" />
+          <div className="adm-login-left-content">
+            <div className="adm-login-left-accent" />
+            <div className="adm-login-left-text">
+              <span className="adm-login-left-line">CONTENT THAT CONNECTS.</span>
+              <span className="adm-login-left-line accent">IMPACT THAT LASTS.</span>
+              <span className="adm-login-left-sub">UTP MedTech Club Content</span>
+              <span className="adm-login-left-sub">Management System</span>
+            </div>
+          </div>
+        </div>
+        <div className="adm-login-right">
+          <div className="adm-login-right-bg" />
+          <div className="adm-login-right-inner">
+            <img
+              src="/medtech-logo.avif"
+              alt="UTP Medtech Club"
+              className="adm-login-logo"
+            />
+            <h1 className="adm-login-heading">Reset Password</h1>
+            <p className="adm-login-desc">Enter your email to receive a reset link.</p>
+            <div className="adm-login-card">
+              {resetSent ? (
+                <div className="adm-lf-success-msg" role="alert">
+                  Check your email for a password reset link.
+                </div>
+              ) : (
+                <form className="adm-login-form" onSubmit={handleResetPassword} noValidate>
+                  <div className="adm-lf-field">
+                    <label htmlFor="reset-email">Email Address</label>
+                    <div className="adm-lf-input-wrap">
+                      <input
+                        id="reset-email"
+                        type="email"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        placeholder="admin@utpmedtech.club"
+                        required
+                        autoComplete="email"
+                      />
+                    </div>
+                  </div>
+                  {error && <div className="adm-lf-error" role="alert">{error}</div>}
+                  <button
+                    type="submit"
+                    className="adm-lf-submit"
+                    disabled={resetLoading}
+                  >
+                    {resetLoading ? "Sending…" : "Send Reset Link"}
+                  </button>
+                </form>
+              )}
+              <button
+                type="button"
+                className="adm-lf-back-link"
+                onClick={() => { setResetMode(false); setResetSent(false); setError(""); }}
+              >
+                Back to sign in
+              </button>
+            </div>
+            <footer className="adm-login-footer">
+              <span>&copy; 2026 UTP MedTech Club. All rights reserved.</span>
+              <a href="#/" className="adm-login-back">Back to website</a>
+            </footer>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="adm-login-page">
-      {/* Left panel — image */}
       <div className="adm-login-left">
         <img
           src="/media/portfolio/portfolio-hero.jpg"
@@ -57,7 +164,6 @@ export function AdminLogin() {
         </div>
       </div>
 
-      {/* Right panel — form */}
       <div className="adm-login-right">
         <div className="adm-login-right-bg" />
         <div className="adm-login-right-inner">
@@ -72,7 +178,6 @@ export function AdminLogin() {
 
           <div className="adm-login-card">
             <form className="adm-login-form" onSubmit={handleSubmit} noValidate>
-              {/* Email */}
               <div className="adm-lf-field">
                 <label htmlFor="login-email">Email Address</label>
                 <div className="adm-lf-input-wrap">
@@ -92,7 +197,6 @@ export function AdminLogin() {
                 </div>
               </div>
 
-              {/* Password */}
               <div className="adm-lf-field">
                 <label htmlFor="login-pass">Password</label>
                 <div className="adm-lf-input-wrap">
@@ -130,7 +234,6 @@ export function AdminLogin() {
                 </div>
               </div>
 
-              {/* Remember me + Forgot */}
               <div className="adm-lf-row">
                 <label className="adm-lf-check">
                   <input type="checkbox" defaultChecked />
@@ -139,17 +242,11 @@ export function AdminLogin() {
                 <button
                   type="button"
                   className="adm-lf-forgot"
-                  onClick={() => setForgotMsg(true)}
+                  onClick={() => setResetMode(true)}
                 >
                   Forgot password?
                 </button>
               </div>
-
-              {forgotMsg && (
-                <div className="adm-lf-forgot-msg" role="alert">
-                  Password recovery is unavailable in demo mode. Use the demo credentials below.
-                </div>
-              )}
 
               {error && (
                 <div className="adm-lf-error" role="alert">{error}</div>
@@ -169,7 +266,9 @@ export function AdminLogin() {
             <button type="button" className="adm-login-demo-btn" onClick={fillDemo}>
               Use demo credentials
             </button>
-            <span className="adm-login-demo-note">Demo authentication — not production security.</span>
+            <span className="adm-login-demo-note">
+              Authenticated via Supabase Auth — no demo password.
+            </span>
           </div>
 
           <footer className="adm-login-footer">

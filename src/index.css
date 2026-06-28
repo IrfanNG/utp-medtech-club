@@ -3389,6 +3389,24 @@ h1, h2, h3, h4 {
   text-align: left;
 }
 
+/* ---------- Success / loading messages ---------- */
+.adm-lf-success-msg,
+.adm-lf-loading-msg {
+  font-size: 14px;
+  color: rgba(255,255,255,.7);
+  padding: 14px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.adm-lf-success-msg {
+  color: #4ade80;
+  background: rgba(74,222,128,.08);
+  border-color: rgba(74,222,128,.15);
+}
+
 /* ---------- Submit button ---------- */
 .adm-lf-submit {
   width: 100%;

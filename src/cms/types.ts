@@ -28,6 +28,7 @@ export interface CmsMedia {
   mimeType: string;
   size: number;
   url: string;
+  storagePath?: string;
   uploadedAt: number;
   builtin: boolean;
 }

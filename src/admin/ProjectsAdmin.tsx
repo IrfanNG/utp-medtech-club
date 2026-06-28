@@ -52,38 +52,52 @@ export function ProjectsAdmin() {
     setModalOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    deleteProject(deleteTarget.id);
-    toast(`Project “${deleteTarget.title}” deleted`, "success");
+    try {
+      await deleteProject(deleteTarget.id);
+      toast(`Project "${deleteTarget.title}" deleted`, "success");
+    } catch {
+      toast("Failed to delete project", "error");
+    }
     setDeleteTarget(null);
   };
 
-  const handleSubmit = (data: Omit<CmsProject, "id" | "createdAt" | "updatedAt">) => {
+  const handleSubmit = async (data: Omit<CmsProject, "id" | "createdAt" | "updatedAt">) => {
     setSaving(true);
     try {
       if (editing) {
-        updateProject(editing.id, data);
-        toast(`Project “${data.title}” updated`, "success");
+        await updateProject(editing.id, data);
+        toast(`Project "${data.title}" updated`, "success");
       } else {
-        createProject(data);
-        toast(`Project “${data.title}” created`, "success");
+        await createProject(data);
+        toast(`Project "${data.title}" created`, "success");
       }
       setModalOpen(false);
+    } catch {
+      toast("Failed to save project", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleFeatured = (p: CmsProject) => {
-    updateProject(p.id, { featured: !p.featured });
-    toast(`${p.title} ${p.featured ? "unfeatured" : "featured"}`, "info");
+  const toggleFeatured = async (p: CmsProject) => {
+    try {
+      await updateProject(p.id, { featured: !p.featured });
+      toast(`${p.title} ${p.featured ? "unfeatured" : "featured"}`, "info");
+    } catch {
+      toast("Failed to toggle featured", "error");
+    }
   };
 
-  const toggleStatus = (p: CmsProject) => {
+  const toggleStatus = async (p: CmsProject) => {
     const next: PublicationStatus = p.status === "published" ? "draft" : "published";
-    updateProject(p.id, { status: next });
-    toast(`${p.title} → ${next}`, "info");
+    try {
+      await updateProject(p.id, { status: next });
+      toast(`${p.title} → ${next}`, "info");
+    } catch {
+      toast("Failed to toggle status", "error");
+    }
   };
 
   return (
@@ -205,7 +219,6 @@ export function ProjectsAdmin() {
         )}
       </div>
 
-      {/* Create/Edit modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -234,11 +247,10 @@ export function ProjectsAdmin() {
         />
       </Modal>
 
-      {/* Delete confirm */}
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete Project"
-        message={`Are you sure you want to delete “${deleteTarget?.title}”? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
@@ -288,12 +300,10 @@ function ProjectForm({
     if (!category.trim()) errs.category = "Category is required";
     if (!year.trim()) errs.year = "Year is required";
     if (!shortDesc.trim()) errs.shortDesc = "Short description is required";
-    const finalCover = coverUrl || coverMedia;
-    if (!finalCover && coverMedia === "") {
-      // allow empty — will use placeholder
-    }
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
+
+    const resolvedCover = coverUrl || coverMedia || "/media/project-1.jpg";
 
     onSubmit({
       title: title.trim(),
@@ -304,7 +314,7 @@ function ProjectForm({
       shortDesc: shortDesc.trim(),
       fullDesc: fullDesc.trim(),
       coverMedia: coverMedia,
-      coverUrl: finalCover || "/media/project-1.jpg",
+      coverUrl: resolvedCover,
       alt: alt.trim() || title.trim(),
       featured,
       status,

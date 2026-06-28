@@ -7,8 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getRepository } from "./localRepository";
-import type { LocalRepository } from "./localRepository";
+import { supabase } from "../lib/supabase";
+import { getRepository } from "./supabaseRepository";
+import type { SupabaseRepository } from "./supabaseRepository";
 import type {
   AdminSession,
   ActivityEntry,
@@ -20,7 +21,7 @@ import type {
 } from "./types";
 
 interface CmsContextValue {
-  repo: LocalRepository;
+  repo: SupabaseRepository;
   /* data */
   projects: CmsProject[];
   clients: CmsClient[];
@@ -32,58 +33,102 @@ interface CmsContextValue {
   /* derived for public pages */
   publishedClients: CmsClient[];
   publishedProjects: CmsProject[];
+  /* loading / error */
+  loading: boolean;
+  error: string | null;
   /* project CRUD */
-  createProject: (p: Omit<CmsProject, "id" | "createdAt" | "updatedAt">) => void;
-  updateProject: (id: string, patch: Partial<CmsProject>) => void;
-  deleteProject: (id: string) => void;
+  createProject: (p: Omit<CmsProject, "id" | "createdAt" | "updatedAt">) => Promise<void>;
+  updateProject: (id: string, patch: Partial<CmsProject>) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
   /* client CRUD */
-  createClient: (c: Omit<CmsClient, "id">) => void;
-  updateClient: (id: string, patch: Partial<CmsClient>) => void;
-  deleteClient: (id: string) => void;
+  createClient: (c: Omit<CmsClient, "id">) => Promise<void>;
+  updateClient: (id: string, patch: Partial<CmsClient>) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
   /* settings */
-  updateSettings: (patch: Partial<SiteSettings>) => void;
+  updateSettings: (patch: Partial<SiteSettings>) => Promise<void>;
   /* media CRUD */
-  addMedia: (m: CmsMedia) => void;
-  updateMedia: (id: string, patch: Partial<CmsMedia>) => void;
+  addMedia: (m: CmsMedia) => Promise<void>;
+  updateMedia: (id: string, patch: Partial<CmsMedia>) => Promise<void>;
   deleteMedia: (id: string) => Promise<void>;
   /* auth */
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   /* refresh */
-  reload: () => void;
+  reload: () => Promise<void>;
 }
 
 const CmsContext = createContext<CmsContextValue | null>(null);
 
-const DEMO_EMAIL = "admin@utpmedtech.club";
-const DEMO_PASSWORD = "medtech-demo";
-
-let idCounter = 0;
-function uid(prefix: string): string {
-  idCounter++;
-  return `${prefix}-${Date.now()}-${idCounter}`;
+function uid(): string {
+  return crypto.randomUUID();
 }
 
 export function CmsProvider({ children }: { children: ReactNode }) {
   const repo = useMemo(() => getRepository(), []);
   const [version, setVersion] = useState(0);
 
-  const [projects, setProjects] = useState<CmsProject[]>(() => repo.getProjects());
-  const [clients, setClients] = useState<CmsClient[]>(() => repo.getClients());
-  const [settings, setSettings] = useState<SiteSettings>(() => repo.getSettings());
-  const [media, setMedia] = useState<CmsMedia[]>(() => repo.getMedia());
-  const [activities, setActivities] = useState<ActivityEntry[]>(() => repo.getActivity());
-  const [auth, setAuth] = useState<AdminSession | null>(() => repo.getAuth());
+  const [projects, setProjects] = useState<CmsProject[]>([]);
+  const [clients, setClients] = useState<CmsClient[]>([]);
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [media, setMedia] = useState<CmsMedia[]>([]);
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const [auth, setAuth] = useState<AdminSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(() => setVersion((v) => v + 1), []);
+  const loadAll = useCallback(async () => {
+    try {
+      setError(null);
+      const [projectsData, clientsData, settingsData, mediaData, activitiesData, authData] =
+        await Promise.all([
+          repo.getProjects(),
+          repo.getClients(),
+          repo.getSettings(),
+          repo.getMedia(),
+          repo.getActivity(),
+          repo.getAuth(),
+        ]);
+      setProjects(projectsData);
+      setClients(clientsData);
+      setSettings(settingsData);
+      setMedia(mediaData);
+      setActivities(activitiesData);
+      setAuth(authData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  }, [repo]);
 
   useEffect(() => {
-    setProjects(repo.getProjects());
-    setClients(repo.getClients());
-    setSettings(repo.getSettings());
-    setMedia(repo.getMedia());
-    setActivities(repo.getActivity());
-  }, [repo, version]);
+    loadAll();
+  }, [loadAll, version]);
+
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      loadAll();
+    });
+    return () => listener?.subscription.unsubscribe();
+  }, [loadAll]);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setVersion((v) => v + 1);
+  }, []);
+
+  const defaultSettings: SiteSettings = {
+    title: "UTP Medtech Club",
+    tagline: "",
+    contactEmail: "",
+    phone: "",
+    address: "",
+    instagramUrl: "",
+    linkedinUrl: "",
+    youtubeUrl: "",
+  };
+
+  const currentSettings = settings ?? defaultSettings;
 
   const publishedClients = useMemo(
     () => clients.filter((c) => c.published).sort((a, b) => a.order - b.order),
@@ -96,139 +141,165 @@ export function CmsProvider({ children }: { children: ReactNode }) {
   );
 
   const createProject = useCallback(
-    (p: Omit<CmsProject, "id" | "createdAt" | "updatedAt">) => {
+    async (p: Omit<CmsProject, "id" | "createdAt" | "updatedAt">) => {
       const now = Date.now();
-      const project: CmsProject = { ...p, id: uid("proj"), createdAt: now, updatedAt: now };
-      const next = [...repo.getProjects(), project];
-      repo.saveProjects(next);
-      repo.addActivity({ type: "project", message: `Created project “${project.title}”` });
-      reload();
+const project: CmsProject = {
+  ...p,
+  id: uid(),
+  createdAt: now,
+  updatedAt: now,
+};
+      const next = [...projects, project];
+      await repo.saveProjects(next);
+      await repo.addActivity({ type: "project", message: `Created project "${project.title}"` });
+      await reload();
     },
-    [repo, reload],
+    [repo, projects, reload],
   );
 
   const updateProject = useCallback(
-    (id: string, patch: Partial<CmsProject>) => {
-      const list = repo.getProjects();
-      const next = list.map((p) =>
+    async (id: string, patch: Partial<CmsProject>) => {
+      const next = projects.map((p) =>
         p.id === id ? { ...p, ...patch, updatedAt: Date.now() } : p,
       );
-      repo.saveProjects(next);
-      repo.addActivity({ type: "project", message: `Updated project “${patch.title ?? list.find((p) => p.id === id)?.title ?? "Untitled"}”` });
-      reload();
+      await repo.saveProjects(next);
+      const title = patch.title ?? projects.find((p) => p.id === id)?.title ?? "Untitled";
+      await repo.addActivity({ type: "project", message: `Updated project "${title}"` });
+      await reload();
     },
-    [repo, reload],
+    [repo, projects, reload],
   );
 
   const deleteProject = useCallback(
-    (id: string) => {
-      const list = repo.getProjects();
-      const target = list.find((p) => p.id === id);
-      const next = list.filter((p) => p.id !== id);
-      repo.saveProjects(next);
-      repo.addActivity({ type: "project", message: `Deleted project “${target?.title ?? "Untitled"}”` });
-      reload();
+    async (id: string) => {
+      const target = projects.find((p) => p.id === id);
+      const next = projects.filter((p) => p.id !== id);
+      await repo.saveProjects(next);
+      await repo.addActivity({
+        type: "project",
+        message: `Deleted project "${target?.title ?? "Untitled"}"`,
+      });
+      await reload();
     },
-    [repo, reload],
+    [repo, projects, reload],
   );
 
   const createClient = useCallback(
-    (c: Omit<CmsClient, "id">) => {
-      const client: CmsClient = { ...c, id: uid("client") };
-      const next = [...repo.getClients(), client];
-      repo.saveClients(next);
-      repo.addActivity({ type: "client", message: `Added client “${client.name}”` });
-      reload();
+    async (c: Omit<CmsClient, "id">) => {
+      const client: CmsClient = { ...c, id: uid() };
+      const next = [...clients, client];
+      await repo.saveClients(next);
+      await repo.addActivity({ type: "client", message: `Added client "${client.name}"` });
+      await reload();
     },
-    [repo, reload],
+    [repo, clients, reload],
   );
 
   const updateClient = useCallback(
-    (id: string, patch: Partial<CmsClient>) => {
-      const list = repo.getClients();
-      const next = list.map((c) => (c.id === id ? { ...c, ...patch } : c));
-      repo.saveClients(next);
-      repo.addActivity({ type: "client", message: `Updated client “${patch.name ?? list.find((c) => c.id === id)?.name ?? "Client"}”` });
-      reload();
+    async (id: string, patch: Partial<CmsClient>) => {
+      const next = clients.map((c) => (c.id === id ? { ...c, ...patch } : c));
+      await repo.saveClients(next);
+      const name = patch.name ?? clients.find((c) => c.id === id)?.name ?? "Client";
+      await repo.addActivity({ type: "client", message: `Updated client "${name}"` });
+      await reload();
     },
-    [repo, reload],
+    [repo, clients, reload],
   );
 
   const deleteClient = useCallback(
-    (id: string) => {
-      const list = repo.getClients();
-      const target = list.find((c) => c.id === id);
-      const next = list.filter((c) => c.id !== id);
-      repo.saveClients(next);
-      repo.addActivity({ type: "client", message: `Deleted client “${target?.name ?? "Client"}”` });
-      reload();
+    async (id: string) => {
+      const target = clients.find((c) => c.id === id);
+      const next = clients.filter((c) => c.id !== id);
+      await repo.saveClients(next);
+      await repo.addActivity({
+        type: "client",
+        message: `Deleted client "${target?.name ?? "Client"}"`,
+      });
+      await reload();
     },
-    [repo, reload],
+    [repo, clients, reload],
   );
 
   const updateSettings = useCallback(
-    (patch: Partial<SiteSettings>) => {
-      const current = repo.getSettings();
-      const next = { ...current, ...patch };
-      repo.saveSettings(next);
-      repo.addActivity({ type: "settings", message: "Updated site settings" });
-      reload();
+    async (patch: Partial<SiteSettings>) => {
+      const next = { ...currentSettings, ...patch };
+      await repo.saveSettings(next);
+      await repo.addActivity({ type: "settings", message: "Updated site settings" });
+      await reload();
     },
-    [repo, reload],
+    [repo, currentSettings, reload],
   );
 
   const addMedia = useCallback(
-    (m: CmsMedia) => {
-      const next = [...repo.getMedia(), m];
-      repo.saveMedia(next);
-      repo.addActivity({ type: "media", message: `Uploaded media “${m.name}”` });
-      reload();
+    async (m: CmsMedia) => {
+      const next = [...media, m];
+      await repo.saveMedia(next);
+      await repo.addActivity({ type: "media", message: `Uploaded media "${m.name}"` });
+      await reload();
     },
-    [repo, reload],
+    [repo, media, reload],
   );
 
   const updateMedia = useCallback(
-    (id: string, patch: Partial<CmsMedia>) => {
-      const list = repo.getMedia();
-      const next = list.map((m) => (m.id === id ? { ...m, ...patch } : m));
-      repo.saveMedia(next);
-      reload();
+    async (id: string, patch: Partial<CmsMedia>) => {
+      const next = media.map((m) => (m.id === id ? { ...m, ...patch } : m));
+      await repo.saveMedia(next);
+      await reload();
     },
-    [repo, reload],
+    [repo, media, reload],
   );
 
   const deleteMedia = useCallback(
     async (id: string) => {
-      const list = repo.getMedia();
-      const target = list.find((m) => m.id === id);
-      const next = list.filter((m) => m.id !== id);
-      repo.saveMedia(next);
-      await repo.deleteMediaBlob(id);
-      if (target) repo.addActivity({ type: "media", message: `Deleted media “${target.name}”` });
-      reload();
+      const target = media.find((m) => m.id === id);
+      const next = media.filter((m) => m.id !== id);
+      await repo.saveMedia(next);
+      if (target && !target.builtin) {
+        await repo.deleteMediaBlob(id);
+      }
+      if (target) {
+        await repo.addActivity({ type: "media", message: `Deleted media "${target.name}"` });
+      }
+      await reload();
+    },
+    [repo, media, reload],
+  );
+
+  const login = useCallback(
+    async (email: string, password: string): Promise<boolean> => {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (signInError) return false;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
+      if (!user) return false;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      if (!profile || profile.role !== "admin") {
+        await supabase.auth.signOut();
+        return false;
+      }
+
+      await repo.addActivity({ type: "auth", message: "Admin signed in" });
+      await reload();
+      return true;
     },
     [repo, reload],
   );
 
-  const login = useCallback(
-    (email: string, password: string): boolean => {
-      if (email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD) {
-        const session: AdminSession = { email: DEMO_EMAIL, loginAt: Date.now() };
-        repo.saveAuth(session);
-        repo.addActivity({ type: "auth", message: "Admin signed in" });
-        setAuth(session);
-        return true;
-      }
-      return false;
-    },
-    [repo],
-  );
-
-  const logout = useCallback(() => {
-    repo.saveAuth(null);
-    repo.addActivity({ type: "auth", message: "Admin signed out" });
+  const logout = useCallback(async () => {
+    await repo.addActivity({ type: "auth", message: "Admin signed out" });
+    await supabase.auth.signOut();
     setAuth(null);
-  }, [repo]);
+    await reload();
+  }, [repo, reload]);
 
   const analytics = useMemo(
     () => repo.getAnalytics(projects, media),
@@ -239,13 +310,15 @@ export function CmsProvider({ children }: { children: ReactNode }) {
     repo,
     projects,
     clients,
-    settings,
+    settings: currentSettings,
     media,
     activities,
     analytics,
     auth,
     publishedClients,
     publishedProjects,
+    loading,
+    error,
     createProject,
     updateProject,
     deleteProject,

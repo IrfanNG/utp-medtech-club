@@ -31,42 +31,56 @@ export function ClientsAdmin() {
     setModalOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    deleteClient(deleteTarget.id);
-    toast(`Client “${deleteTarget.name}” deleted`, "success");
+    try {
+      await deleteClient(deleteTarget.id);
+      toast(`Client "${deleteTarget.name}" deleted`, "success");
+    } catch {
+      toast("Failed to delete client", "error");
+    }
     setDeleteTarget(null);
   };
 
-  const handleSubmit = (data: Omit<CmsClient, "id">) => {
+  const handleSubmit = async (data: Omit<CmsClient, "id">) => {
     setSaving(true);
     try {
       if (editing) {
-        updateClient(editing.id, data);
-        toast(`Client “${data.name}” updated`, "success");
+        await updateClient(editing.id, data);
+        toast(`Client "${data.name}" updated`, "success");
       } else {
-        createClient(data);
-        toast(`Client “${data.name}” added`, "success");
+        await createClient(data);
+        toast(`Client "${data.name}" added`, "success");
       }
       setModalOpen(false);
+    } catch {
+      toast("Failed to save client", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  const togglePublished = (c: CmsClient) => {
-    updateClient(c.id, { published: !c.published });
-    toast(`${c.name} ${c.published ? "hidden" : "published"}`, "info");
+  const togglePublished = async (c: CmsClient) => {
+    try {
+      await updateClient(c.id, { published: !c.published });
+      toast(`${c.name} ${c.published ? "hidden" : "published"}`, "info");
+    } catch {
+      toast("Failed to toggle visibility", "error");
+    }
   };
 
-  const moveOrder = (c: CmsClient, dir: -1 | 1) => {
+  const moveOrder = async (c: CmsClient, dir: -1 | 1) => {
     const list = [...clients].sort((a, b) => a.order - b.order);
     const idx = list.findIndex((x) => x.id === c.id);
     const swapIdx = idx + dir;
     if (swapIdx < 0 || swapIdx >= list.length) return;
     const swapTarget = list[swapIdx];
-    updateClient(c.id, { order: swapTarget.order });
-    updateClient(swapTarget.id, { order: c.order });
+    try {
+      await updateClient(c.id, { order: swapTarget.order });
+      await updateClient(swapTarget.id, { order: c.order });
+    } catch {
+      toast("Failed to reorder", "error");
+    }
   };
 
   return (
@@ -187,7 +201,6 @@ export function ClientsAdmin() {
         </div>
       )}
 
-      {/* Create/Edit modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -211,11 +224,10 @@ export function ClientsAdmin() {
         />
       </Modal>
 
-      {/* Delete confirm */}
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete Client"
-        message={`Are you sure you want to delete “${deleteTarget?.name}”?`}
+        message={`Are you sure you want to delete "${deleteTarget?.name}"?`}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />

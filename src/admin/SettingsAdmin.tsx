@@ -13,7 +13,7 @@ export function SettingsAdmin() {
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!form.title.trim()) errs.title = "Title is required";
@@ -27,8 +27,10 @@ export function SettingsAdmin() {
 
     setSaving(true);
     try {
-      updateSettings(form);
+      await updateSettings(form);
       toast("Settings saved", "success");
+    } catch {
+      toast("Failed to save settings", "error");
     } finally {
       setSaving(false);
     }
@@ -44,7 +46,6 @@ export function SettingsAdmin() {
       </div>
 
       <form className="adm-form adm-settings-form" onSubmit={handleSubmit} noValidate>
-        {/* General */}
         <div className="adm-card adm-settings-section">
           <div className="adm-card-head">
             <h3>General</h3>
@@ -73,7 +74,6 @@ export function SettingsAdmin() {
           </div>
         </div>
 
-        {/* Contact */}
         <div className="adm-card adm-settings-section">
           <div className="adm-card-head">
             <h3>Contact Information</h3>
@@ -111,7 +111,6 @@ export function SettingsAdmin() {
           </div>
         </div>
 
-        {/* Social */}
         <div className="adm-card adm-settings-section">
           <div className="adm-card-head">
             <h3>Social Media</h3>
@@ -139,7 +138,6 @@ export function SettingsAdmin() {
           })}
         </div>
 
-        {/* Save */}
         <div className="adm-settings-actions">
           <a href="#/" className="adm-btn adm-btn-outline">
             <AdminIcon.eye size={18} /> Preview Site

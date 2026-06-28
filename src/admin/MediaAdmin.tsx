@@ -34,21 +34,21 @@ export function MediaAdmin() {
       setUploading(true);
       try {
         for (const file of Array.from(files)) {
-          const id = `media-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const id = crypto.randomUUID();
           const kind: MediaKind = file.type.startsWith("video") ? "video" : "image";
-          await repo.putMediaBlob(id, file);
-          const objUrl = URL.createObjectURL(file);
+          const { url, storagePath } = await repo.putMediaBlob(id, file);
           const record: CmsMedia = {
             id,
             name: file.name,
             kind,
             mimeType: file.type || "application/octet-stream",
             size: file.size,
-            url: objUrl,
+            url,
+            storagePath,
             uploadedAt: Date.now(),
             builtin: false,
           };
-          addMedia(record);
+          await addMedia(record);
         }
         toast(`${files.length} file${files.length > 1 ? "s" : ""} uploaded`, "success");
       } catch {
@@ -72,14 +72,15 @@ export function MediaAdmin() {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     if (!deleteTarget.builtin) {
-      await deleteMedia(deleteTarget.id);
+      try {
+        await deleteMedia(deleteTarget.id);
+        toast(`Media "${deleteTarget.name}" deleted`, "success");
+      } catch {
+        toast("Failed to delete media", "error");
+      }
     } else {
-      updateMedia(deleteTarget.id, { });
       toast("Built-in media cannot be deleted from the library.", "info");
-      setDeleteTarget(null);
-      return;
     }
-    toast(`Media “${deleteTarget.name}” deleted`, "success");
     setDeleteTarget(null);
   };
 
@@ -88,10 +89,14 @@ export function MediaAdmin() {
     setRenameValue(m.name);
   };
 
-  const confirmRename = () => {
+  const confirmRename = async () => {
     if (!renaming) return;
-    updateMedia(renaming.id, { name: renameValue.trim() || renaming.name });
-    toast("Media renamed", "success");
+    try {
+      await updateMedia(renaming.id, { name: renameValue.trim() || renaming.name });
+      toast("Media renamed", "success");
+    } catch {
+      toast("Failed to rename media", "error");
+    }
     setRenaming(null);
   };
 
@@ -107,7 +112,6 @@ export function MediaAdmin() {
         </div>
       </div>
 
-      {/* Upload zone */}
       <div
         className={`adm-dropzone ${dragActive ? "active" : ""}`}
         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
@@ -131,7 +135,6 @@ export function MediaAdmin() {
         <span className="adm-dropzone-sub">Supports images and videos</span>
       </div>
 
-      {/* Toolbar */}
       <div className="adm-toolbar">
         <div className="adm-toolbar-left">
           <div className="adm-btn-group">
@@ -176,7 +179,6 @@ export function MediaAdmin() {
         </div>
       </div>
 
-      {/* Media grid/list */}
       {filtered.length === 0 ? (
         <div className="adm-table-card">
           <EmptyState
@@ -273,7 +275,6 @@ export function MediaAdmin() {
         </div>
       )}
 
-      {/* Preview modal */}
       {preview && (
         <div className="adm-modal-overlay" onClick={() => setPreview(null)}>
           <div className="adm-modal adm-modal-lg adm-preview-modal" onClick={(e) => e.stopPropagation()}>
@@ -300,7 +301,6 @@ export function MediaAdmin() {
         </div>
       )}
 
-      {/* Rename modal */}
       {renaming && (
         <div className="adm-modal-overlay" onClick={() => setRenaming(null)}>
           <div className="adm-modal adm-modal-sm" onClick={(e) => e.stopPropagation()}>
@@ -330,14 +330,13 @@ export function MediaAdmin() {
         </div>
       )}
 
-      {/* Delete confirm */}
       <ConfirmDialog
         open={!!deleteTarget}
         title={deleteTarget?.builtin ? "Built-in Media" : "Delete Media"}
         message={
           deleteTarget?.builtin
             ? "Built-in media files cannot be deleted. They are part of the website's original assets."
-            : `Are you sure you want to delete “${deleteTarget?.name}”?`
+            : `Are you sure you want to delete "${deleteTarget?.name}"?`
         }
         confirmLabel={deleteTarget?.builtin ? "OK" : "Delete"}
         onConfirm={confirmDelete}
@@ -361,4 +360,3 @@ function formatDate(ts: number): string {
   if (!ts) return "—";
   return new Date(ts).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" });
 }
-

@@ -189,7 +189,8 @@ function parseHash(): { path: string; anchor: string } {
   const h = window.location.hash || "#/";
   const clean = h.startsWith("#") ? h.slice(1) : h;
   if (clean === "" || clean === "/") return { path: "/", anchor: "" };
-  const [path, anchor] = clean.split("#");
+  const [rest, anchor] = clean.split("#");
+  const path = rest?.split("?")[0] ?? "/";
   return { path: path || "/", anchor: anchor || "" };
 }
 

@@ -8,39 +8,36 @@ import type {
   SiteSettings,
 } from "./types";
 
+export interface UploadResult {
+  url: string;
+  storagePath: string;
+}
+
 export interface CmsRepository {
-  /* ---- Projects ---- */
-  getProjects(): CmsProject[];
-  saveProjects(projects: CmsProject[]): void;
+  getProjects(): Promise<CmsProject[]>;
+  saveProjects(projects: CmsProject[]): Promise<void>;
 
-  /* ---- Clients ---- */
-  getClients(): CmsClient[];
-  saveClients(clients: CmsClient[]): void;
+  getClients(): Promise<CmsClient[]>;
+  saveClients(clients: CmsClient[]): Promise<void>;
 
-  /* ---- Settings ---- */
-  getSettings(): SiteSettings;
-  saveSettings(settings: SiteSettings): void;
+  getSettings(): Promise<SiteSettings>;
+  saveSettings(settings: SiteSettings): Promise<void>;
 
-  /* ---- Media metadata ---- */
-  getMedia(): CmsMedia[];
-  saveMedia(media: CmsMedia[]): void;
+  getMedia(): Promise<CmsMedia[]>;
+  saveMedia(media: CmsMedia[]): Promise<void>;
 
-  /* ---- Media blobs (IndexedDB) ---- */
   getMediaBlob(id: string): Promise<Blob | null>;
-  putMediaBlob(id: string, blob: Blob): Promise<void>;
+  putMediaBlob(id: string, blob: Blob): Promise<UploadResult>;
   deleteMediaBlob(id: string): Promise<void>;
 
-  /* ---- Auth ---- */
-  getAuth(): AdminSession | null;
-  saveAuth(session: AdminSession | null): void;
+  getAuth(): Promise<AdminSession | null>;
+  saveAuth(session: AdminSession | null): Promise<void>;
 
-  /* ---- Analytics ---- */
   getAnalytics(
     projects: CmsProject[],
     media: CmsMedia[],
   ): AnalyticsSnapshot;
 
-  /* ---- Activity ---- */
-  getActivity(): ActivityEntry[];
-  addActivity(entry: Omit<ActivityEntry, "id" | "timestamp">): void;
+  getActivity(): Promise<ActivityEntry[]>;
+  addActivity(entry: Omit<ActivityEntry, "id" | "timestamp">): Promise<void>;
 }

@@ -7,7 +7,7 @@ import type {
   CmsProject,
   SiteSettings,
 } from "./types";
-import type { CmsRepository } from "./repository";
+import type { CmsRepository, UploadResult } from "./repository";
 import { seedClients, seedMedia, seedProjects, seedSettings } from "./seed";
 
 /* ---------- localStorage keys ---------- */
@@ -36,11 +36,11 @@ function writeJson<T>(key: string, value: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* storage full — ignore in prototype */
+    /* storage full */
   }
 }
 
-/* ---------- IndexedDB helper for media blobs ---------- */
+/* ---------- IndexedDB helper ---------- */
 
 const DB_NAME = "mtc-media-store";
 const DB_STORE = "blobs";
@@ -81,7 +81,7 @@ function genSeries(): { date: string; views: number; visitors: number }[] {
   return out;
 }
 
-/* ---------- Repository implementation ---------- */
+/* ---------- Repository ---------- */
 
 export class LocalRepository implements CmsRepository {
   private seriesCache: { date: string; views: number; visitors: number }[] | null = null;
@@ -101,39 +101,38 @@ export class LocalRepository implements CmsRepository {
     }
   }
 
-  /* ---- Projects ---- */
-  getProjects(): CmsProject[] {
+  async getProjects(): Promise<CmsProject[]> {
     return readJson<CmsProject[]>(KEYS.projects, seedProjects);
   }
-  saveProjects(projects: CmsProject[]): void {
+
+  async saveProjects(projects: CmsProject[]): Promise<void> {
     writeJson(KEYS.projects, projects);
   }
 
-  /* ---- Clients ---- */
-  getClients(): CmsClient[] {
+  async getClients(): Promise<CmsClient[]> {
     return readJson<CmsClient[]>(KEYS.clients, seedClients);
   }
-  saveClients(clients: CmsClient[]): void {
+
+  async saveClients(clients: CmsClient[]): Promise<void> {
     writeJson(KEYS.clients, clients);
   }
 
-  /* ---- Settings ---- */
-  getSettings(): SiteSettings {
+  async getSettings(): Promise<SiteSettings> {
     return readJson<SiteSettings>(KEYS.settings, seedSettings);
   }
-  saveSettings(settings: SiteSettings): void {
+
+  async saveSettings(settings: SiteSettings): Promise<void> {
     writeJson(KEYS.settings, settings);
   }
 
-  /* ---- Media metadata ---- */
-  getMedia(): CmsMedia[] {
+  async getMedia(): Promise<CmsMedia[]> {
     return readJson<CmsMedia[]>(KEYS.media, seedMedia);
   }
-  saveMedia(media: CmsMedia[]): void {
+
+  async saveMedia(media: CmsMedia[]): Promise<void> {
     writeJson(KEYS.media, media);
   }
 
-  /* ---- Media blobs ---- */
   async getMediaBlob(id: string): Promise<Blob | null> {
     const db = await openDb();
     return new Promise((resolve, reject) => {
@@ -143,15 +142,18 @@ export class LocalRepository implements CmsRepository {
       req.onerror = () => reject(req.error);
     });
   }
-  async putMediaBlob(id: string, blob: Blob): Promise<void> {
+
+  async putMediaBlob(id: string, blob: Blob): Promise<UploadResult> {
     const db = await openDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(DB_STORE, "readwrite");
       tx.objectStore(DB_STORE).put(blob, id);
-      tx.oncomplete = () => resolve();
+      const url = URL.createObjectURL(blob);
+      tx.oncomplete = () => resolve({ url, storagePath: id });
       tx.onerror = () => reject(tx.error);
     });
   }
+
   async deleteMediaBlob(id: string): Promise<void> {
     const db = await openDb();
     return new Promise((resolve, reject) => {
@@ -162,16 +164,15 @@ export class LocalRepository implements CmsRepository {
     });
   }
 
-  /* ---- Auth ---- */
-  getAuth(): AdminSession | null {
+  async getAuth(): Promise<AdminSession | null> {
     return readJson<AdminSession | null>(KEYS.auth, null);
   }
-  saveAuth(session: AdminSession | null): void {
+
+  async saveAuth(session: AdminSession | null): Promise<void> {
     if (session) writeJson(KEYS.auth, session);
     else localStorage.removeItem(KEYS.auth);
   }
 
-  /* ---- Analytics ---- */
   getAnalytics(projects: CmsProject[], media: CmsMedia[]): AnalyticsSnapshot {
     if (!this.seriesCache) this.seriesCache = genSeries();
     const series = this.seriesCache;
@@ -213,12 +214,12 @@ export class LocalRepository implements CmsRepository {
     };
   }
 
-  /* ---- Activity ---- */
-  getActivity(): ActivityEntry[] {
+  async getActivity(): Promise<ActivityEntry[]> {
     return readJson<ActivityEntry[]>(KEYS.activity, []);
   }
-  addActivity(entry: Omit<ActivityEntry, "id" | "timestamp">): void {
-    const list = this.getActivity();
+
+  async addActivity(entry: Omit<ActivityEntry, "id" | "timestamp">): Promise<void> {
+    const list = readJson<ActivityEntry[]>(KEYS.activity, []);
     const full: ActivityEntry = {
       ...entry,
       id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
