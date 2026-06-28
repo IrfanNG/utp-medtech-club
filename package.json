@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:wrangler": "wrangler pages dev dist -- npm run build",
+    "dev": "wrangler pages dev --port 8080 -- vite",
+    "dev:vite": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"

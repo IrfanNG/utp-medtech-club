@@ -314,6 +314,13 @@ export class SupabaseRepository implements CmsRepository {
       const res = await fetch("/api/analytics", {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        return {
+          series: [],
+          error: "Analytics endpoint unavailable locally. Use `npm run dev` (port 8080) to test analytics, or configure Pages Functions in production.",
+        };
+      }
       if (res.status === 503) {
         return { series: [], error: "Cloudflare analytics not configured. Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_TAG in Pages env vars." };
       }
