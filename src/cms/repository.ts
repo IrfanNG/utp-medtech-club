@@ -36,7 +36,7 @@ export interface CmsRepository {
   getAnalytics(
     projects: CmsProject[],
     media: CmsMedia[],
-  ): AnalyticsSnapshot;
+  ): Promise<AnalyticsSnapshot>;
 
   getActivity(): Promise<ActivityEntry[]>;
   addActivity(entry: Omit<ActivityEntry, "id" | "timestamp">): Promise<void>;

@@ -73,6 +73,7 @@ export function CmsProvider({ children }: { children: ReactNode }) {
   const [media, setMedia] = useState<CmsMedia[]>([]);
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [auth, setAuth] = useState<AdminSession | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsSnapshot>(() => defaultAnalytics());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,6 +95,8 @@ export function CmsProvider({ children }: { children: ReactNode }) {
       setMedia(mediaData);
       setActivities(activitiesData);
       setAuth(authData);
+      const analyticsData = await repo.getAnalytics(projectsData, mediaData);
+      setAnalytics(analyticsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
@@ -301,11 +304,6 @@ const project: CmsProject = {
     await reload();
   }, [repo, reload]);
 
-  const analytics = useMemo(
-    () => repo.getAnalytics(projects, media),
-    [repo, projects, media],
-  );
-
   const value: CmsContextValue = {
     repo,
     projects,
@@ -341,4 +339,20 @@ export function useCms(): CmsContextValue {
   const ctx = useContext(CmsContext);
   if (!ctx) throw new Error("useCms must be used within CmsProvider");
   return ctx;
+}
+
+function defaultAnalytics(): AnalyticsSnapshot {
+  return {
+    totalPageViews: 0,
+    totalVisitors: 0,
+    totalProjects: 0,
+    totalImages: 0,
+    totalVideos: 0,
+    series: [],
+    totalViews: 0,
+    uniqueVisitors: 0,
+    avgSessionDuration: "0m 0s",
+    recentProjects: [],
+    contentOverview: [],
+  };
 }

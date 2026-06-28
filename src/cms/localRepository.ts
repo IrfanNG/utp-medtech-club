@@ -173,7 +173,7 @@ export class LocalRepository implements CmsRepository {
     else localStorage.removeItem(KEYS.auth);
   }
 
-  getAnalytics(projects: CmsProject[], media: CmsMedia[]): AnalyticsSnapshot {
+  async getAnalytics(projects: CmsProject[], media: CmsMedia[]): Promise<AnalyticsSnapshot> {
     if (!this.seriesCache) this.seriesCache = genSeries();
     const series = this.seriesCache;
     const totalViews = series.reduce((s, p) => s + p.views, 0);

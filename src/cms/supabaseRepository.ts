@@ -2,6 +2,7 @@ import { supabase } from "../lib/supabase";
 import type {
   ActivityEntry,
   AdminSession,
+  AnalyticsPoint,
   AnalyticsSnapshot,
   CmsClient,
   CmsMedia,
@@ -326,14 +327,29 @@ export class SupabaseRepository implements CmsRepository {
     }
   }
 
-  /* ---- Analytics (unchanged mock) ---- */
+  /* ---- Analytics ---- */
 
-  getAnalytics(
+  private async fetchSeries(): Promise<AnalyticsPoint[]> {
+    try {
+      const res = await fetch("/api/analytics");
+      if (!res.ok) return [];
+      const body = (await res.json()) as { series?: AnalyticsPoint[] };
+      return body.series ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  async getAnalytics(
     projects: CmsProject[],
     media: CmsMedia[],
-  ): AnalyticsSnapshot {
-    if (!this.seriesCache) this.seriesCache = genSeries();
-    const series = this.seriesCache;
+  ): Promise<AnalyticsSnapshot> {
+    const series = await this.fetchSeries();
+    if (series.length === 0) {
+      if (!this.seriesCache) this.seriesCache = genSeries();
+      series.push(...this.seriesCache);
+    }
+
     const totalViews = series.reduce((s, p) => s + p.views, 0);
     const uniqueVisitors = series.reduce((s, p) => s + p.visitors, 0);
     const images = media.filter((m) => m.kind === "image").length;
@@ -344,8 +360,8 @@ export class SupabaseRepository implements CmsRepository {
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 5);
     const avgSec = 184 + Math.round(Math.random() * 60);
-    const m = Math.floor(avgSec / 60);
-    const s = avgSec % 60;
+    const avgM = Math.floor(avgSec / 60);
+    const avgS = avgSec % 60;
 
     return {
       totalPageViews: totalViews,
@@ -356,7 +372,7 @@ export class SupabaseRepository implements CmsRepository {
       series,
       totalViews,
       uniqueVisitors,
-      avgSessionDuration: `${m}m ${s}s`,
+      avgSessionDuration: `${avgM}m ${avgS}s`,
       recentProjects: recent.map((p) => ({
         title: p.title,
         status: p.status,
