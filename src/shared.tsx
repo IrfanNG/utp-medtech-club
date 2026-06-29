@@ -147,24 +147,49 @@ export function SocialGlyph({ paths }: { paths: ReactNode }) {
 /* ---------- Scroll reveal hook ---------- */
 export function useReveal(dep?: unknown) {
   useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]:not(.is-visible)"));
-    if (!("IntersectionObserver" in window) || els.length === 0) {
-      els.forEach((el) => el.classList.add("is-visible"));
-      return;
+    const supported = "IntersectionObserver" in window;
+    let io: IntersectionObserver | null = null;
+
+    if (supported) {
+      io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              io!.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+      );
     }
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            io.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+
+    const scan = () => {
+      const els = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-reveal]:not(.is-visible)"),
+      );
+      if (io) {
+        els.forEach((el) => io!.observe(el));
+      } else {
+        els.forEach((el) => el.classList.add("is-visible"));
+      }
+    };
+
+    scan();
+
+    /* Pick up elements mounted after async data arrives */
+    let raf = 0;
+    const mo = new MutationObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(scan);
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      mo.disconnect();
+      io?.disconnect();
+    };
   }, [dep]);
 }
 
@@ -198,4 +223,13 @@ export function usePageTitle(title: string) {
   useEffect(() => {
     document.title = title;
   }, [title]);
+}
+
+/* ---------- Slug helper ---------- */
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

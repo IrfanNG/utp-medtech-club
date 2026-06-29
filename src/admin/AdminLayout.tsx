@@ -11,11 +11,12 @@ export interface SidebarItem {
 
 export const sidebarItems: SidebarItem[] = [
   { label: "Dashboard", href: "#/admin", icon: AdminIcon.dashboard },
-  { label: "Landing Page", href: "#/admin/landing", icon: AdminIcon.pages, soon: true },
-  { label: "About Us", href: "#/admin/about-content", icon: AdminIcon.about, soon: true },
-  { label: "Services", href: "#/admin/services", icon: AdminIcon.services, soon: true },
+  { label: "Landing Page", href: "#/admin/landing", icon: AdminIcon.pages },
+  { label: "About Us", href: "#/admin/about-content", icon: AdminIcon.about },
+  { label: "Services", href: "#/admin/services", icon: AdminIcon.services },
   { label: "Projects", href: "#/admin/projects", icon: AdminIcon.projects },
-  { label: "Contact", href: "#/admin/contact-content", icon: AdminIcon.contact, soon: true },
+  { label: "Contact", href: "#/admin/contact-content", icon: AdminIcon.contact },
+  { label: "Submissions", href: "#/admin/submissions", icon: AdminIcon.inbox },
   { label: "Clients", href: "#/admin/clients", icon: AdminIcon.clients },
   { label: "Media Library", href: "#/admin/media", icon: AdminIcon.media },
   { label: "Settings", href: "#/admin/settings", icon: AdminIcon.settings },

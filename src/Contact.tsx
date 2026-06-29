@@ -9,35 +9,17 @@ import {
 import { Footer, Header } from "./Chrome";
 import { useCms } from "./cms/CmsContext";
 
-const requestTypes = [
-  "Technical - Crew Service",
-  "Video - Editing",
-  "Photo - Event/Convo",
-  "Design - Printings (banner/t-shirt/lanyard)",
-  "Technical - Multi Camera Production",
-  "Video - Shooting",
-  "Design - Digital Posters/Logo",
-  "Other",
+const COUNTRY_CODES = [
+  { value: "+60", label: "Malaysia (+60)" },
+  { value: "+65", label: "Singapore (+65)" },
+  { value: "+62", label: "Indonesia (+62)" },
+  { value: "+673", label: "Brunei (+673)" },
+  { value: "+66", label: "Thailand (+66)" },
+  { value: "+1", label: "United States (+1)" },
+  { value: "+44", label: "United Kingdom (+44)" },
+  { value: "+91", label: "India (+91)" },
+  { value: "+61", label: "Australia (+61)" },
 ];
-
-const hearAboutOptions = [
-  "Instagram",
-  "TikTok",
-  "LinkedIn",
-  "Website",
-  "MEDTECH Booth (Hari Kantri/CAVE)",
-  "Friends",
-  "Other",
-];
-
-const exemptionOptions = ["Yes", "No", "Not applicable"];
-
-function makeCaptcha(len = 5) {
-  const chars = "abcdefghijkmnpqrstuvwxyz23456789";
-  let out = "";
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
 
 export default function Contact() {
   const { settings } = useCms();
@@ -52,26 +34,86 @@ export default function Contact() {
 }
 
 function ContactContent() {
+  const { contactContent } = useCms();
   const [submitted, setSubmitted] = useState(false);
-  const [captcha] = useState(() => makeCaptcha());
-  const [otherOpen, setOtherOpen] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [organisationType, setOrganisationType] = useState("UTP");
+  const [requestTypeSelection, setRequestTypeSelection] = useState<string[]>([]);
   const [hearOtherOpen, setHearOtherOpen] = useState(false);
   const [fileName, setFileName] = useState("");
   const [fileError, setFileError] = useState("");
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     if (!form.checkValidity()) {
       form.reportValidity();
       return;
     }
-    setSubmitted(true);
-    form.reset();
-    setOtherOpen(false);
-    setHearOtherOpen(false);
-    setFileName("");
-    window.setTimeout(() => setSubmitted(false), 6000);
+
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const formData = new FormData(form);
+      const idempotencyKey = crypto.randomUUID();
+      const requestTypes = formData.getAll("requestType").map(String);
+      const requestHasOther = requestTypes.includes("Other");
+      const rawBudget = String(formData.get("budget") || "").trim();
+      const normalizedBudget = rawBudget ? (rawBudget.toUpperCase().startsWith("RM") ? rawBudget : `RM ${rawBudget}`) : "";
+
+      const body: Record<string, unknown> = {
+        idempotencyKey,
+        fullName: formData.get("fullName"),
+        email: formData.get("email"),
+        countryCode: formData.get("countryCode"),
+        phoneNumber: formData.get("phoneNumber"),
+        organisationType: formData.get("organisationType"),
+        organisation: formData.get("organisation"),
+        project: formData.get("project"),
+        budget: normalizedBudget,
+        requestTypes,
+        requestTypeOther: requestHasOther ? formData.get("requestTypeOther") || "" : "",
+        exemption: String(formData.get("organisationType")) === "UTP" ? formData.get("exemption") || "" : "",
+        eventDate: formData.get("eventDate"),
+        inquiry: formData.get("inquiry"),
+        hearAbout: formData.get("hearAbout"),
+        hearAboutOther: formData.get("hearAboutOther") || "",
+        referral: formData.get("referral") || "",
+      };
+
+      const file = (form.querySelector('[name="attachment"]') as HTMLInputElement)?.files?.[0];
+      if (file) {
+        formData.set("attachment", file);
+        body.attachment = file.name;
+      }
+
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errBody = (await res.json()) as { error?: string };
+        setSubmitError(errBody.error || `Submission failed (${res.status})`);
+        setSubmitting(false);
+        return;
+      }
+
+      setSubmitted(true);
+      form.reset();
+      setOrganisationType("UTP");
+      setRequestTypeSelection([]);
+      setHearOtherOpen(false);
+      setFileName("");
+      window.setTimeout(() => setSubmitted(false), 6000);
+    } catch {
+      setSubmitError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,25 +138,27 @@ function ContactContent() {
     setFileName(f.name);
   };
 
+  const requestHasOther = requestTypeSelection.includes("Other");
+
   return (
     <>
       {/* Contact Hero */}
       <section className="contact-hero">
         <img
-          src="/media/contact/contact-hero.jpg"
+          src={contactContent.heroImage}
           alt="MedTech production workstation with studio equipment"
           className="contact-hero-bg"
         />
         <div className="contact-hero-overlay" />
         <div className="container contact-hero-content">
-          <span className="eyebrow hero-step">CONTACT US</span>
+          <span className="eyebrow hero-step">{contactContent.heroEyebrow}</span>
           <h1 className="hero-step">
-            LET&rsquo;S CREATE<br />SOMETHING AMAZING.
+            {contactContent.heroTitle.split("\n").map((line, i) => (
+              <span key={i}>{i > 0 && <br />}{line}</span>
+            ))}
           </h1>
           <p className="hero-step">
-            We are more than happy to hear any comments or inquiries from you.
-            Fill in the form below and our team will get back to you as soon as
-            possible.
+            {contactContent.heroDescription}
           </p>
         </div>
       </section>
@@ -125,148 +169,204 @@ function ContactContent() {
           <div className="inquiry-card" {...reveal}>
             <div className="inquiry-card-head">
               <div className="inquiry-head-text">
-                <h2>MEDTECH SERVICE INQUIRY</h2>
+                <h2>{contactContent.formTitle}</h2>
                 <p>
-                  We are more than happy to hear any comments or inquiries from
-                  you. Should you need more information and assistance from us,
-                  feel free to fill in the forms below. You may contact us to book
-                  our services for technical crew assistance for events in
-                  Universiti Teknologi PETRONAS or even do photo and/or video
-                  coverage of your memorable occasions via the form below.
+                  {contactContent.formIntro}
                 </p>
               </div>
               <div className="inquiry-mascot">
-                <img src="/media/contact/mattek.png" alt="MATTEK mascot" loading="lazy" />
+                <img src={contactContent.mascotImage} alt="MATTEK mascot" loading="lazy" />
               </div>
             </div>
 
             {submitted && (
               <div className="form-success" role="alert">
-                Thank you. Your inquiry has been received.
+                {contactContent.successMessage}
+              </div>
+            )}
+
+            {submitError && (
+              <div className="form-success" role="alert" style={{ background: "#fef2f2", color: "#dc2626", borderColor: "#fecaca" }}>
+                {submitError}
               </div>
             )}
 
             <form className="inquiry-form" onSubmit={handleSubmit} noValidate>
               {/* Left column */}
               <div className="form-col">
-                <Field label="Full Name" required>
-                  <input type="text" name="fullName" placeholder="Enter your full name" required />
-                </Field>
+                {contactContent.fields.fullName?.enabled && (
+                  <Field label={contactContent.fields.fullName.label} required={contactContent.fields.fullName.required}>
+                    <input type="text" name="fullName" placeholder={contactContent.fields.fullName.placeholder} required={contactContent.fields.fullName.required} />
+                  </Field>
+                )}
 
-                <Field label="Email" required>
-                  <input type="email" name="email" placeholder="example@utp.edu.my" required />
-                </Field>
+                {contactContent.fields.email?.enabled && (
+                  <Field label={contactContent.fields.email.label} required={contactContent.fields.email.required}>
+                    <input type="email" name="email" placeholder={contactContent.fields.email.placeholder} required={contactContent.fields.email.required} />
+                  </Field>
+                )}
 
-                <Field label="Phone Number" required>
-                  <div className="phone-row">
-                    <input type="tel" name="phoneArea" placeholder="012" inputMode="numeric" pattern="[0-9]{2,4}" required aria-label="Phone area code" />
-                    <input type="tel" name="phoneNumber" placeholder="3456789" inputMode="numeric" required aria-label="Phone number" />
-                  </div>
-                </Field>
+                {contactContent.fields.phone?.enabled && (
+                  <Field label={contactContent.fields.phone.label} required={contactContent.fields.phone.required}>
+                    <div className="phone-row">
+                      {contactContent.fields.countryCode?.enabled !== false && (
+                        <select
+                          name="countryCode"
+                          defaultValue="+60"
+                          required={contactContent.fields.countryCode?.required ?? true}
+                          aria-label={contactContent.fields.countryCode?.label || "Country code"}
+                        >
+                          {COUNTRY_CODES.map((code) => (
+                            <option key={code.value} value={code.value}>{code.label}</option>
+                          ))}
+                        </select>
+                      )}
+                      <input type="tel" name="phoneNumber" placeholder="123456789" inputMode="numeric" required={contactContent.fields.phone.required} aria-label="Phone number" />
+                    </div>
+                  </Field>
+                )}
 
-                <Field label="Organisation" required>
-                  <input type="text" name="organisation" placeholder="Example: UTP MEDTECH Club / UTP ConvFest" required />
-                </Field>
+                {contactContent.fields.organisationType?.enabled !== false && (
+                  <Field label={contactContent.fields.organisationType?.label || "Organisation Type"} required={contactContent.fields.organisationType?.required ?? true}>
+                    <div className="radio-row">
+                      {["UTP", "External"].map((type) => (
+                        <label className="radio-item" key={type}>
+                          <input
+                            type="radio"
+                            name="organisationType"
+                            value={type}
+                            checked={organisationType === type}
+                            required={contactContent.fields.organisationType?.required ?? true}
+                            onChange={(e) => setOrganisationType(e.target.value)}
+                          />
+                          <span>{type}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </Field>
+                )}
 
-                <Field label="Name of Project" required>
-                  <input type="text" name="project" placeholder="Example: Iftar Perdana, CONVOFest" required />
-                </Field>
+                {contactContent.fields.organisation?.enabled && (
+                  <Field label={contactContent.fields.organisation.label} required={contactContent.fields.organisation.required}>
+                    <input type="text" name="organisation" placeholder={contactContent.fields.organisation.placeholder} required={contactContent.fields.organisation.required} />
+                  </Field>
+                )}
 
-                <Field label="Budget Range" required>
-                  <input type="text" name="budget" placeholder="Example: RM800, RM3k" required />
-                </Field>
+                {contactContent.fields.project?.enabled && (
+                  <Field label={contactContent.fields.project.label} required={contactContent.fields.project.required}>
+                    <input type="text" name="project" placeholder={contactContent.fields.project.placeholder} required={contactContent.fields.project.required} />
+                  </Field>
+                )}
 
-                <Field label="Type of Request" required>
-                  <div className="check-grid">
-                    {requestTypes.map((t) => (
-                      <label className="check-item" key={t}>
-                        <input
-                          type="checkbox"
-                          name="requestType"
-                          value={t}
-                          onChange={(e) => setOtherOpen(e.target.checked && t === "Other")}
-                        />
-                        <span>{t}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {otherOpen && (
-                    <input type="text" name="requestTypeOther" placeholder="Please specify" className="other-input" />
-                  )}
-                </Field>
+                {contactContent.fields.budget?.enabled && (
+                  <Field label={contactContent.fields.budget.label} required={contactContent.fields.budget.required}>
+                    <div className="money-input">
+                      <span>RM</span>
+                      <input type="text" name="budget" placeholder={contactContent.fields.budget.placeholder} required={contactContent.fields.budget.required} />
+                    </div>
+                  </Field>
+                )}
 
-                <Field label="If your event is during weekdays, are exemption letters provided?">
-                  <div className="radio-row">
-                    {exemptionOptions.map((o) => (
-                      <label className="radio-item" key={o}>
-                        <input type="radio" name="exemption" value={o} />
-                        <span>{o}</span>
-                      </label>
-                    ))}
-                  </div>
-                </Field>
+                {contactContent.fields.requestType?.enabled && (
+                  <Field label={contactContent.fields.requestType.label} required={contactContent.fields.requestType.required}>
+                    <div className="check-grid">
+                      {contactContent.requestTypes.map((t) => (
+                        <label className="check-item" key={t}>
+                          <input
+                            type="checkbox"
+                            name="requestType"
+                            value={t}
+                            onChange={(e) => {
+                              setRequestTypeSelection((prev) =>
+                                e.target.checked ? [...prev, t] : prev.filter((item) => item !== t),
+                              );
+                            }}
+                          />
+                          <span>{t}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {requestHasOther && (
+                      <input type="text" name="requestTypeOther" placeholder="Please specify" className="other-input" required />
+                    )}
+                  </Field>
+                )}
 
-                <Field label="Date of Event / Expected Deadline" required>
-                  <input type="date" name="eventDate" required />
-                </Field>
+                {contactContent.fields.exemption?.enabled && organisationType === "UTP" && (
+                  <Field label={contactContent.fields.exemption.label}>
+                    <div className="radio-row">
+                      {contactContent.exemptionOptions.map((o) => (
+                        <label className="radio-item" key={o}>
+                          <input type="radio" name="exemption" value={o} />
+                          <span>{o}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </Field>
+                )}
+
+                {contactContent.fields.eventDate?.enabled && (
+                  <Field label={contactContent.fields.eventDate.label} required={contactContent.fields.eventDate.required}>
+                    <input type="date" name="eventDate" required={contactContent.fields.eventDate.required} />
+                  </Field>
+                )}
               </div>
 
               {/* Right column */}
               <div className="form-col">
-                <Field label="Inquiry" required>
-                  <textarea name="inquiry" rows={6} placeholder="Enter your inquiry here..." required />
-                </Field>
+                {contactContent.fields.inquiry?.enabled && (
+                  <Field label={contactContent.fields.inquiry.label} required={contactContent.fields.inquiry.required}>
+                    <textarea name="inquiry" rows={6} placeholder={contactContent.fields.inquiry.placeholder} required={contactContent.fields.inquiry.required} />
+                  </Field>
+                )}
 
-                <Field label="File attachment">
-                  <div className="file-widget">
-                    <label className="file-btn">
-                      <input type="file" accept=".pdf,application/pdf" onChange={handleFile} />
-                      Browse Files
-                    </label>
-                    {fileName && <span className="file-name">{fileName}</span>}
-                  </div>
-                  {fileError && <span className="field-error">{fileError}</span>}
-                  <span className="helper">Only documents in .pdf format is accepted, and the files shall not exceed 3MB</span>
-                </Field>
-
-                <Field label="Where did you hear about us?" required>
-                  <div className="radio-grid">
-                    {hearAboutOptions.map((o) => (
-                      <label className="radio-item" key={o}>
-                        <input
-                          type="radio"
-                          name="hearAbout"
-                          value={o}
-                          required
-                          onChange={(e) => setHearOtherOpen(e.target.checked && o === "Other")}
-                        />
-                        <span>{o}</span>
+                {contactContent.fields.attachment?.enabled && (
+                  <Field label={contactContent.fields.attachment.label}>
+                    <div className="file-widget">
+                      <label className="file-btn">
+                        <input type="file" name="attachment" accept=".pdf,application/pdf" onChange={handleFile} />
+                        Browse Files
                       </label>
-                    ))}
-                  </div>
-                  {hearOtherOpen && (
-                    <input type="text" name="hearAboutOther" placeholder="Please specify" className="other-input" />
-                  )}
-                </Field>
+                      {fileName && <span className="file-name">{fileName}</span>}
+                    </div>
+                    {fileError && <span className="field-error">{fileError}</span>}
+                    <span className="helper">Only documents in .pdf format is accepted, and the files shall not exceed 3MB</span>
+                  </Field>
+                )}
 
-                <Field label="Insert your referral code">
-                  <input type="text" name="referral" placeholder="Referral code (optional)" />
-                </Field>
+                {contactContent.fields.hearAbout?.enabled && (
+                  <Field label={contactContent.fields.hearAbout.label} required={contactContent.fields.hearAbout.required}>
+                    <div className="radio-grid">
+                      {contactContent.hearAboutOptions.map((o) => (
+                        <label className="radio-item" key={o}>
+                          <input
+                            type="radio"
+                            name="hearAbout"
+                            value={o}
+                            required={contactContent.fields.hearAbout.required}
+                            onChange={(e) => setHearOtherOpen(e.target.checked && o === "Other")}
+                          />
+                          <span>{o}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {hearOtherOpen && (
+                      <input type="text" name="hearAboutOther" placeholder="Please specify" className="other-input" />
+                    )}
+                  </Field>
+                )}
 
-                <Field label="Insert your promo code">
-                  <input type="text" name="promo" placeholder="Promo code (optional)" />
-                </Field>
-
-                <Field label="Enter the message as it&rsquo;s shown" required>
-                  <div className="captcha-row">
-                    <span className="captcha-box" aria-hidden="true">{captcha}</span>
-                    <input type="text" name="captcha" placeholder="Type the code above" required pattern={captcha} />
-                  </div>
-                </Field>
+                {contactContent.fields.referral?.enabled && (
+                  <Field label={contactContent.fields.referral.label}>
+                    <input type="text" name="referral" placeholder={contactContent.fields.referral.placeholder} />
+                  </Field>
+                )}
               </div>
 
               <div className="form-submit">
-                <button type="submit" className="btn btn-primary btn-submit">SUBMIT</button>
+                <button type="submit" className="btn btn-primary btn-submit" disabled={submitting}>
+                  {submitting ? "SUBMITTING…" : "SUBMIT"}
+                </button>
               </div>
             </form>
           </div>

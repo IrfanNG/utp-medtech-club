@@ -2,37 +2,13 @@ import {
   Icon,
   delayStyle,
   reveal,
+  slugify,
   SocialGlyph,
   usePageTitle,
 } from "./shared";
 import { Footer, Header } from "./Chrome";
 import { useCms } from "./cms/CmsContext";
-
-const aboutHero = "/media/about/about-hero.jpg";
-
-const gallery = [
-  { span: "wide", label: "O'WEEK MAY 25", img: "/media/about/oweek-may-25.jpg", alt: "Orientation week May 2025 event photo" },
-  { span: "", label: "SONY WORKSHOP", img: "/media/about/sony-workshop.jpg", alt: "Sony camera workshop session" },
-  { span: "", label: "SUKMED 24", img: "/media/about/sukmed-24.jpg", alt: "Sukmed 2024 event activities" },
-  { span: "wide", label: "KAKI PHOTO 2025", img: "/media/about/kaki-photo-2025.jpg", alt: "Kaki Photo 2025 meetup" },
-  { span: "", label: "KEMBARA RAYA 24", img: "/media/about/kembara-raya-24.jpg", alt: "Kembara Raya 2024 road trip" },
-  { span: "wide", label: "SEA AWARDS 2024", img: "/media/about/sea-awards-2024.jpg", alt: "SEA Awards 2024 ceremony" },
-  { span: "", label: "CYBERGEN 2025", img: "/media/about/cybergen-2025.jpg", alt: "Cybergen 2025 event" },
-  { span: "wide", label: "BROTHER & SISTER 2.0", img: "/media/about/brother-sister-2.jpg", alt: "Brother and Sister 2.0 programme" },
-  { span: "", label: "BOOTCAMP 2024", img: "/media/about/bootcamp-2024.jpg", alt: "MedTech bootcamp 2024 training" },
-  { span: "wide", label: "CULTRA 2024", img: "/media/about/cultra-2024.jpg", alt: "Cultra 2024 cultural festival" },
-];
-
-const team = [
-  { name: "Norkamar Faridatul Salwa Binti Kamarudin", role: "Manager (ICT Security & Governance)", dept: "Digital Innovation & Technology", img: "/media/team/norkamar-faridatul.jpg", tier: 0 },
-  { name: "Ahmad Ilman Hakim Bin Jasmin", role: "President of MedTech", img: "/media/team/ahmad-ilman.jpg", tier: 1 },
-  { name: "Ahmad Ashraf Bin Fauzi", role: "Vice President", dept: "Business", img: "/media/team/ahmad-ashraf.jpg", tier: 2 },
-  { name: "Aqryf Syah Bin Azrul Syahrin", role: "Vice President", dept: "Development", img: "/media/team/aqryf-syah.jpg", tier: 2 },
-  { name: "Nur Hidayah Binti Zakaria", role: "Secretary I", img: "/media/team/nur-hidayah.jpg", tier: 3 },
-  { name: "Zafira Agnia Damiat", role: "Secretary II", img: "/media/team/zafira-agnia.jpg", tier: 3 },
-  { name: "Muzzammil Ikhwan Bin Rasit", role: "Treasurer I", img: "/media/team/muzzammil-ikhwan.jpg", tier: 3 },
-  { name: "Muhammad Zal Hasmi Bin Mat Zaidi", role: "Treasurer II", img: "/media/team/zal-hasmi.jpg", tier: 3 },
-];
+import type { AboutGalleryItem } from "./cms/pageSchemas";
 
 export default function About() {
   const { settings } = useCms();
@@ -47,21 +23,21 @@ export default function About() {
 }
 
 function AboutContent() {
+  const { aboutContent } = useCms();
   return (
     <>
       {/* About Hero */}
       <section id="about-hero" className="about-hero">
         <div className="about-hero-bg">
-          <img src={aboutHero} alt="Camera crew at an event production setup" className="hero-bg-img" />
+          <img src={aboutContent.heroImage} alt="Camera crew at an event production setup" className="hero-bg-img" />
         </div>
         <div className="container about-hero-content">
-          <span className="eyebrow hero-step">ABOUT US</span>
-          <h1 className="hero-step">The Core Strength<br />Of The Organization</h1>
+          <span className="eyebrow hero-step">{aboutContent.heroEyebrow}</span>
+          <h1 className="hero-step">{aboutContent.heroTitle.split("\n").map((line, i) => (
+            <span key={i}>{i > 0 && <br />}{line}</span>
+          ))}</h1>
           <p className="hero-step">
-            We are a student-driven multimedia and event production team from
-            Universiti Teknologi PETRONAS. Driven by passion, creativity and
-            commitment, we transform ideas into impactful visual experiences
-            and deliver excellence in every production.
+            {aboutContent.heroDescription}
           </p>
         </div>
       </section>
@@ -71,40 +47,24 @@ function AboutContent() {
         <div className="container">
           <div className="about-masonry">
             <div className="about-card about-intro-card" {...reveal}>
-              <span className="eyebrow">About Us</span>
-              <h3>Introduction</h3>
-              <p>
-                We are a passionate group of students united by our love for
-                multimedia and event production. Through teamwork, creativity and
-                hands-on experience, we continue to grow, learn and deliver
-                productions that leave a lasting impact. Every project we take
-                on is a step towards excellence and a reflection of who we are.
-              </p>
-              <p>
-                Driven by a shared vision and supported by strong values, we
-                strive to create meaningful experiences and memories for every
-                client and every audience.
-              </p>
+              <span className="eyebrow">{aboutContent.introEyebrow}</span>
+              <h3>{aboutContent.introTitle}</h3>
+              {aboutContent.introParagraphs.map((p, i) => <p key={i}>{p}</p>)}
               <span className="about-accent-line" />
             </div>
 
-            {gallery.slice(0, 2).map((g, i) => (
+            {aboutContent.gallery.slice(0, 2).map((g, i) => (
               <GalleryCard key={g.label} g={g} i={i + 1} />
             ))}
 
             <div className="about-card about-philosophy-card" {...reveal} style={delayStyle(120)}>
-              <span className="eyebrow">About Us</span>
-              <h3>Our Philosophy</h3>
-              <p>
-                We believe in teamwork, continuous improvement and giving our
-                best in every project we handle. We don&rsquo;t just capture
-                moments — we create experiences that last and stories that
-                connect people to what truly matters.
-              </p>
+              <span className="eyebrow">{aboutContent.philosophyEyebrow}</span>
+              <h3>{aboutContent.philosophyTitle}</h3>
+              {aboutContent.philosophyParagraphs.map((p, i) => <p key={i}>{p}</p>)}
               <span className="about-accent-line" />
             </div>
 
-            {gallery.slice(2).map((g, i) => (
+            {aboutContent.gallery.slice(2).map((g, i) => (
               <GalleryCard key={g.label} g={g} i={i + 3} />
             ))}
           </div>
@@ -116,10 +76,10 @@ function AboutContent() {
         <div className="team-grid-bg" />
         <div className="container">
           <div className="section-head about-team-head" {...reveal}>
-            <span className="eyebrow">The people behind the lens</span>
-            <h2 className="section-title">OUR TEAM</h2>
+            <span className="eyebrow">{aboutContent.teamEyebrow}</span>
+            <h2 className="section-title">{aboutContent.teamHeading}</h2>
           </div>
-          <TeamOrgChart />
+          <TeamOrgChart team={aboutContent.team} />
         </div>
       </section>
 
@@ -155,18 +115,20 @@ function CMSClients() {
   );
 }
 
-function GalleryCard({ g, i }: { g: { span: string; label: string; img: string; alt: string }; i: number }) {
+function GalleryCard({ g, i }: { g: AboutGalleryItem; i: number }) {
+  const slug = g.slug || slugify(g.label);
   return (
-    <div className={`about-gallery-card ${g.span}`} {...reveal} style={delayStyle(i * 70)}>
+    <a href={`#/about/program/${slug}`} className={`about-gallery-card ${g.span}`} {...reveal} style={delayStyle(i * 70)}>
       <img src={g.img} alt={g.alt} loading="lazy" className="card-img" />
       <div className="about-gallery-overlay" />
       <div className="about-gallery-accent" />
       <span className="about-gallery-label">{g.label}</span>
-    </div>
+      <span className="about-gallery-arrow">↗</span>
+    </a>
   );
 }
 
-function TeamOrgChart() {
+function TeamOrgChart({ team }: { team: { name: string; role: string; dept: string; img: string; tier: number }[] }) {
   const tiers = [0, 1, 2, 3] as const;
   return (
     <div className="org-chart">
@@ -186,6 +148,113 @@ function TeamOrgChart() {
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ---------- Program Detail Page ---------- */
+
+export function ProgramDetail({ slug }: { slug: string }) {
+  const { aboutContent, settings } = useCms();
+  usePageTitle(`Program — ${settings.title}`);
+
+  const program = aboutContent.gallery.find((g) => {
+    const s = g.slug || slugify(g.label);
+    return s === slug;
+  });
+
+  if (!program) {
+    return (
+      <div className="app">
+        <Header activePath="/about" />
+        <section className="section" style={{ textAlign: "center" }}>
+          <div className="container">
+            <h2 style={{ marginBottom: "16px" }}>Program not found</h2>
+            <p style={{ color: "var(--muted)", marginBottom: "32px" }}>
+              The program you are looking for does not exist or may have been removed.
+            </p>
+            <a href="#/about" className="btn btn-primary">← Back to About</a>
+          </div>
+        </section>
+        <Footer />
+      </div>
+    );
+  }
+
+  const detailTitle = program.detailTitle || program.label;
+  const detailBody = program.detailBody;
+  const detailGallery = program.detailGallery.filter(Boolean);
+  const meta = [
+    program.detailCategory,
+    program.detailDate,
+    program.detailLocation,
+  ].filter(Boolean);
+
+  return (
+    <div className="app">
+      <Header activePath="/about" />
+
+      {/* Hero / cover image */}
+      <section className="program-detail-hero">
+        <img src={program.img} alt={program.alt} className="program-detail-hero-img" />
+        <div className="program-detail-hero-overlay" />
+        <div className="container program-detail-hero-content">
+          {meta.length > 0 && (
+            <div className="program-detail-meta">
+              {meta.map((m, i) => (
+                <span key={i}>{m}</span>
+              ))}
+            </div>
+          )}
+          <h1 className="hero-step">{detailTitle}</h1>
+        </div>
+      </section>
+
+      {/* Body */}
+      <section className="section program-detail-body">
+        <div className="container program-detail-inner">
+          <a href="#/about" className="program-detail-back">
+            ← Back to About
+          </a>
+
+          {detailBody ? (
+            <div className="program-detail-text">
+              {detailBody.split("\n").map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+          ) : (
+            <p className="program-detail-placeholder">
+              Details for this program will be available soon.
+            </p>
+          )}
+
+          {detailGallery.length > 0 && (
+            <div className="program-detail-gallery" {...reveal}>
+              <h3 className="program-detail-section-title">Gallery</h3>
+              <div className="program-detail-gallery-grid">
+                {detailGallery.map((img, i) => (
+                  <div className="program-detail-gallery-item" key={i} {...reveal} style={delayStyle(i * 80)}>
+                    <img src={img} alt={`${detailTitle} — image ${i + 1}`} loading="lazy" className="card-img" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {program.detailVideo && (
+            <div className="program-detail-video" {...reveal}>
+              <h3 className="program-detail-section-title">Video</h3>
+              <a href={program.detailVideo} target="_blank" rel="noreferrer" className="program-detail-video-link">
+                <span className="program-detail-video-play">▷</span>
+                Watch Video
+              </a>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <Footer />
     </div>
   );
 }

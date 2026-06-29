@@ -101,10 +101,15 @@ export function Footer() {
             <div className="logo">
               <img src="/medtech-logo.avif" alt={settings.title} className="logo-img" />
             </div>
-            <p>
-              We are a multimedia and event production team committed to capturing
-              moments, creating impact, and delivering excellence.
-            </p>
+            <div className="footer-meta">
+              <p className="footer-ssm">SSM : 202003353564 (003207951-A)</p>
+              <p>
+                UTP MEDTECH Club is an organisation consists of UTP students that are interested in learning media stuff.
+              </p>
+              <p>
+                Disclaimer: UTP MEDTECH Club shall not be liable for any loss or damage by the usage of any information obtained from this website.
+              </p>
+            </div>
             <div className="footer-socials">
               {socialItems.map((s) => (
                 <a key={s.label} href={s.url} target="_blank" rel="noreferrer" aria-label={s.label}>

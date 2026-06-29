@@ -1,17 +1,12 @@
 import {
-  ctaImg,
   delayStyle,
-  features,
-  heroImg,
   reveal,
-  services,
-  stats,
-  testimonials,
-  whyImg,
   usePageTitle,
 } from "./shared";
 import { Footer, Header, SideRail } from "./Chrome";
 import { useCms } from "./cms/CmsContext";
+import { useEffect, useState } from "react";
+import type { ServiceCard } from "./cms/pageSchemas";
 
 export default function Home() {
   const { settings } = useCms();
@@ -26,23 +21,27 @@ export default function Home() {
 }
 
 function HomeContent() {
-  const { publishedClients, publishedProjects } = useCms();
+  const { publishedClients, publishedProjects, landingContent, servicesContent } = useCms();
   const featuredProjects = publishedProjects.filter((p) => p.featured).slice(0, 3);
   const cmsClients = publishedClients.map((c) => c.name);
+  const visibleServices = servicesContent.services.filter((s) => s.visible).sort((a, b) => a.order - b.order);
+  const [activeService, setActiveService] = useState<number | null>(null);
+
+  const openService = (i: number) => setActiveService(i);
+  const closeService = () => setActiveService(null);
+
   return (
     <>
       {/* Hero */}
       <section id="home" className="hero">
         <div className="hero-bg">
-          <img src={heroImg} alt="Camera crew operating professional video equipment on set" className="hero-bg-img" />
+          <img src={landingContent.hero.image} alt="Camera crew operating professional video equipment on set" className="hero-bg-img" />
         </div>
         <div className="container hero-content">
-          <span className="eyebrow hero-step">We Capture. We Create. We Deliver.</span>
-          <h1 className="hero-step">Bringing Moments to Life.</h1>
+          <span className="eyebrow hero-step">{landingContent.hero.eyebrow}</span>
+          <h1 className="hero-step">{landingContent.hero.title}</h1>
           <p className="hero-step">
-            UTP MedTech Crew is a multimedia production studio crafting photography,
-            videography, live streaming and end-to-end event solutions for leading
-            organizations across Malaysia and beyond.
+            {landingContent.hero.description}
           </p>
           <div className="hero-actions hero-step">
             <a href="#/portfolio" className="btn btn-primary">View Portfolio <span className="btn-arrow">→</span></a>
@@ -59,7 +58,7 @@ function HomeContent() {
       {/* Logo strip */}
       <section id="clients" className="logo-strip">
         <div className="container" {...reveal}>
-          <p>Trusted by leading organizations</p>
+          <p>{landingContent.clientStripHeading}</p>
           <div className="logos">
             {cmsClients.map((c) => (
               <span key={c}>{c}</span>
@@ -72,12 +71,21 @@ function HomeContent() {
       <section id="services" className="section service-panels">
         <div className="container">
           <div className="section-head" {...reveal}>
-            <span className="eyebrow">What we do</span>
-            <h2 className="section-title">Our Services</h2>
+            <span className="eyebrow">{landingContent.servicesEyebrow}</span>
+            <h2 className="section-title">{landingContent.servicesHeading}</h2>
           </div>
           <div className="service-panels-list">
-            {services.map((s, i) => (
-              <div className="service-panel" key={s.title} {...reveal} style={delayStyle(i * 100)}>
+            {visibleServices.map((s, i) => (
+              <div
+                className="service-panel"
+                key={s.title}
+                role="button"
+                tabIndex={0}
+                onClick={() => openService(i)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openService(i); } }}
+                {...reveal}
+                style={delayStyle(i * 100)}
+              >
                 <div className="panel-number">
                   <span>{String(i + 1).padStart(2, "0")}</span>
                 </div>
@@ -93,6 +101,7 @@ function HomeContent() {
                   <div className="panel-body">
                     <h3>{s.title}</h3>
                     <p>{s.desc}</p>
+                    <span className="panel-learn-more">Learn more →</span>
                   </div>
                 </div>
               </div>
@@ -105,8 +114,8 @@ function HomeContent() {
       <section id="projects" className="section" style={{ marginTop: "-20px" }}>
         <div className="container">
           <div className="section-head" {...reveal}>
-            <span className="eyebrow">Selected work</span>
-            <h2 className="section-title">Featured Projects</h2>
+            <span className="eyebrow">{landingContent.projectsEyebrow}</span>
+            <h2 className="section-title">{landingContent.projectsHeading}</h2>
           </div>
           <div className="projects-grid">
             {featuredProjects.map((p, i) => (
@@ -116,7 +125,7 @@ function HomeContent() {
                 <div className="project-info">
                   <div className="project-tag">{p.category}</div>
                   <h3>{p.title}</h3>
-                  <a href="#/portfolio" className="project-link">
+                  <a href={`#/portfolio/project/${p.slug}`} className="project-link">
                     View Project <span>→</span>
                   </a>
                 </div>
@@ -130,7 +139,7 @@ function HomeContent() {
       <section className="stats">
         <div className="container">
           <div className="stats-grid">
-            {stats.map((s, i) => (
+            {landingContent.stats.map((s, i) => (
               <div className="stat" key={s.label} {...reveal} style={delayStyle(i * 80)}>
                 <div className="num">{s.num}<span className="plus">{s.plus}</span></div>
                 <div className="label">{s.label}</div>
@@ -145,19 +154,17 @@ function HomeContent() {
         <div className="container">
           <div className="why-grid">
             <div className="why-left" {...reveal}>
-              <span className="eyebrow">Why choose us</span>
-              <h2>Why Leading Organizations Trust MedTech</h2>
+              <span className="eyebrow">{landingContent.whyEyebrow}</span>
+              <h2>{landingContent.whyHeading}</h2>
               <p>
-                For over two decades we have powered high-stakes productions —
-                from leadership summits to national convocations — with a crew
-                obsessed with craft and reliability.
+                {landingContent.whyDescription}
               </p>
             </div>
             <div className="why-img" {...reveal} style={delayStyle(120)}>
-              <img src={whyImg} alt="Camera crew setting up equipment on a production set" loading="lazy" className="card-img" />
+              <img src={landingContent.whyImage} alt="Camera crew setting up equipment on a production set" loading="lazy" className="card-img" />
             </div>
             <div className="features" {...reveal} style={delayStyle(240)}>
-              {features.map((f) => (
+              {landingContent.features.map((f) => (
                 <div className="feature" key={f.title}>
                   <span className="dot" />
                   <div>
@@ -175,11 +182,11 @@ function HomeContent() {
       <section className="section" style={{ marginTop: "-40px" }}>
         <div className="container">
           <div className="section-head" {...reveal}>
-            <span className="eyebrow">Client voices</span>
-            <h2 className="section-title">Trusted by Clients, Proven by Results</h2>
+            <span className="eyebrow">{landingContent.testimonialsEyebrow}</span>
+            <h2 className="section-title">{landingContent.testimonialsHeading}</h2>
           </div>
           <div className="testimonials-grid">
-            {testimonials.map((t, i) => (
+            {landingContent.testimonials.map((t, i) => (
               <div className="testimonial" key={t.name} {...reveal} style={delayStyle(i * 100)}>
                 <span className="quote-mark">&ldquo;</span>
                 <p>{t.quote}</p>
@@ -199,16 +206,114 @@ function HomeContent() {
       {/* Final CTA */}
       <section className="final-cta">
         <div className="final-cta-bg">
-          <img src={ctaImg} alt="Concert crowd with stage lighting" loading="lazy" className="card-img" />
+          <img src={landingContent.cta.image} alt="Concert crowd with stage lighting" loading="lazy" className="card-img" />
         </div>
         <div className="container" {...reveal}>
-          <h2>Let&rsquo;s Create Something Extraordinary Together.</h2>
+          <h2>{landingContent.cta.title}</h2>
           <div className="final-cta-actions">
             <a href="#/contact" className="btn btn-primary">Get a Quote <span className="btn-arrow">→</span></a>
             <a href="#/portfolio" className="btn btn-outline">Explore Portfolio</a>
           </div>
         </div>
       </section>
+
+      {/* Service detail modal */}
+      {activeService !== null && visibleServices[activeService] && (
+        <ServiceModal service={visibleServices[activeService]} onClose={closeService} />
+      )}
     </>
   );
+}
+
+/* ---------- Service Detail Modal ---------- */
+
+function ServiceModal({ service, onClose }: { service: ServiceCard; onClose: () => void }) {
+  useServiceModalEffects(onClose);
+
+  const detailTitle = service.detailTitle || service.title;
+  const detailBody = service.detailBody || service.desc;
+  const allImages = [...service.images, ...service.detailGallery].filter(Boolean);
+  const highlights = service.detailHighlights.filter(Boolean);
+
+  return (
+    <div className="service-modal-overlay" onClick={onClose}>
+      <div
+        className="service-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={detailTitle}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button className="service-modal-close" onClick={onClose} aria-label="Close dialog">
+          ×
+        </button>
+
+        <div className="service-modal-scroll">
+          {allImages.length > 0 && (
+            <div className="service-modal-media">
+              {allImages.slice(0, 3).map((img, i) => (
+                <div className="service-modal-img-wrap" key={i}>
+                  <img src={img} alt={`${detailTitle} — image ${i + 1}`} loading="lazy" className="card-img" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="service-modal-body">
+            <span className="eyebrow">Service</span>
+            <h2>{detailTitle}</h2>
+
+            <div className="service-modal-desc">
+              {detailBody.split("\n").map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+
+            {highlights.length > 0 && (
+              <ul className="service-modal-highlights">
+                {highlights.map((h, i) => (
+                  <li key={i}>
+                    <span className="service-modal-bullet">▸</span>
+                    {h}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {service.detailVideo && (
+              <div className="service-modal-video">
+                <a href={service.detailVideo} target="_blank" rel="noreferrer" className="service-modal-video-link">
+                  <span className="service-modal-video-play">▷</span>
+                  Watch Video
+                </a>
+              </div>
+            )}
+
+            {service.detailCta && (
+              <div className="service-modal-actions">
+                <a href="#/contact" className="btn btn-primary" onClick={onClose}>
+                  {service.detailCta} <span className="btn-arrow">→</span>
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useServiceModalEffects(onClose: () => void) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
 }

@@ -2,10 +2,15 @@ import type {
   AdminSession,
   ActivityEntry,
   AnalyticsSnapshot,
+  ContactSubmission,
   CmsClient,
   CmsMedia,
   CmsProject,
+  ContentStage,
+  PageContentRow,
+  PageKey,
   SiteSettings,
+  SubmissionStatus,
 } from "./types";
 
 export interface UploadResult {
@@ -40,4 +45,16 @@ export interface CmsRepository {
 
   getActivity(): Promise<ActivityEntry[]>;
   addActivity(entry: Omit<ActivityEntry, "id" | "timestamp">): Promise<void>;
+
+  /* Page content */
+  getPageContent(pageKey: PageKey, stage: ContentStage): Promise<PageContentRow | null>;
+  savePageDraft(pageKey: PageKey, content: unknown): Promise<void>;
+  publishPage(pageKey: PageKey): Promise<void>;
+  getAllPageContent(stage: ContentStage): Promise<PageContentRow[]>;
+
+  /* Contact submissions */
+  getSubmissions(status?: SubmissionStatus): Promise<ContactSubmission[]>;
+  getSubmission(id: string): Promise<ContactSubmission | null>;
+  updateSubmission(id: string, patch: { status?: SubmissionStatus; adminNotes?: string }): Promise<void>;
+  deleteSubmission(id: string): Promise<void>;
 }

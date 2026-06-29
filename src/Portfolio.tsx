@@ -39,7 +39,7 @@ export default function Portfolio() {
 }
 
 function PortfolioContent() {
-  const { publishedProjects, publishedClients } = useCms();
+  const { publishedProjects, publishedClients, loading } = useCms();
   const [activeFilter, setActiveFilter] = useState("All Projects");
   const [query, setQuery] = useState("");
 
@@ -55,6 +55,11 @@ function PortfolioContent() {
       return catOk && qOk;
     });
   }, [publishedProjects, activeFilter, query]);
+
+  const featuredProject = useMemo(
+    () => publishedProjects.find((p) => p.featured) ?? publishedProjects[0] ?? null,
+    [publishedProjects],
+  );
 
   return (
     <>
@@ -104,34 +109,43 @@ function PortfolioContent() {
       {/* Featured Project */}
       <section className="portfolio-featured">
         <div className="container" {...reveal}>
-          <div className="featured-card">
-            <div className="featured-img">
-              <img src="/media/project-1.jpg" alt="PETRONAS Leadership Excellence Program 2024 conference" loading="lazy" className="card-img" />
-              <div className="featured-overlay" />
-              <div className="featured-slider-meta">
-                <span>01 — 05</span>
-                <div className="featured-arrows">
-                  <button aria-label="Previous" disabled>‹</button>
-                  <button aria-label="Next" disabled>›</button>
+          {loading ? (
+            <div className="featured-card featured-skeleton">
+              <div className="featured-img skeleton-block" />
+              <div className="featured-body">
+                <div className="skeleton-bar skeleton-bar-sm" />
+                <div className="skeleton-bar skeleton-bar-xl" />
+                <div className="skeleton-bar skeleton-bar-md" />
+                <div className="skeleton-bar skeleton-bar-lg" />
+                <div className="skeleton-bar skeleton-bar-btn" />
+              </div>
+            </div>
+          ) : featuredProject ? (
+            <div className="featured-card">
+              <div className="featured-img">
+                <img src={featuredProject.coverUrl} alt={featuredProject.alt} loading="lazy" className="card-img" />
+                <div className="featured-overlay" />
+                <div className="featured-slider-meta">
+                  <span>FEATURED</span>
                 </div>
               </div>
-            </div>
-            <div className="featured-body">
-              <span className="featured-label">FEATURED PROJECT</span>
-              <h2>PETRONAS LEADERSHIP EXCELLENCE PROGRAM 2024</h2>
-              <div className="featured-meta">
-                <span>Corporate Event</span>
-                <span>2024</span>
-                <span>Kuala Lumpur</span>
+              <div className="featured-body">
+                <span className="featured-label">FEATURED PROJECT</span>
+                <h2>{featuredProject.title}</h2>
+                <div className="featured-meta">
+                  <span>{featuredProject.category}</span>
+                  <span>{featuredProject.year}</span>
+                  {featuredProject.location && <span>{featuredProject.location}</span>}
+                </div>
+                <p>{featuredProject.shortDesc || featuredProject.fullDesc}</p>
+                <a href={`#/portfolio/project/${featuredProject.slug}`} className="btn btn-primary">VIEW CASE STUDY →</a>
               </div>
-              <p>
-                A leadership development program bringing together participants
-                from across PETRONAS for an impactful 3-day experience filled with
-                knowledge sharing, networking and team building.
-              </p>
-              <a href="#/portfolio" className="btn btn-primary">VIEW CASE STUDY →</a>
             </div>
-          </div>
+          ) : (
+            <div className="featured-empty">
+              <p>No featured project available yet.</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -142,12 +156,25 @@ function PortfolioContent() {
             <span className="eyebrow">All Projects</span>
             <h2 className="section-title">PROJECT GALLERY</h2>
           </div>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="portfolio-grid">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div className="pfolio-card pfolio-skeleton" key={i}>
+                  <div className="pfolio-card-img skeleton-block" />
+                  <div className="pfolio-card-body">
+                    <div className="skeleton-bar skeleton-bar-sm" />
+                    <div className="skeleton-bar skeleton-bar-md" />
+                    <div className="skeleton-bar skeleton-bar-xs" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
             <p className="no-results">No projects found.</p>
           ) : (
             <div className="portfolio-grid">
               {filtered.map((p, i) => (
-                <div className="pfolio-card" key={p.id} {...reveal} style={delayStyle(i * 80)}>
+                <a href={`#/portfolio/project/${p.slug}`} className="pfolio-card" key={p.id} {...reveal} style={delayStyle(i * 80)}>
                   <div className="pfolio-card-img">
                     <img src={p.coverUrl} alt={p.alt} loading="lazy" className="card-img" />
                     <div className="pfolio-card-overlay" />
@@ -158,7 +185,7 @@ function PortfolioContent() {
                     <h3>{p.title}</h3>
                     <span className="pfolio-card-year">{p.year}</span>
                   </div>
-                </div>
+                </a>
               ))}
             </div>
           )}
@@ -219,5 +246,159 @@ function PortfolioContent() {
         </div>
       </section>
     </>
+  );
+}
+
+/* ---------- Project Detail Page ---------- */
+
+export function ProjectDetail({ slug }: { slug: string }) {
+  const { publishedProjects, settings, loading } = useCms();
+  usePageTitle(`Project — ${settings.title}`);
+
+  const project = publishedProjects.find((p) => p.slug === slug);
+
+  if (loading) {
+    return (
+      <div className="app">
+        <Header activePath="/portfolio" />
+        <section className="section project-detail-body">
+          <div className="container project-detail-inner">
+            <div className="featured-card featured-skeleton">
+              <div className="featured-img skeleton-block" />
+              <div className="featured-body">
+                <div className="skeleton-bar skeleton-bar-sm" />
+                <div className="skeleton-bar skeleton-bar-xl" />
+                <div className="skeleton-bar skeleton-bar-lg" />
+                <div className="skeleton-bar skeleton-bar-lg" />
+              </div>
+            </div>
+          </div>
+        </section>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="app">
+        <Header activePath="/portfolio" />
+        <section className="section" style={{ textAlign: "center" }}>
+          <div className="container">
+            <h2 style={{ marginBottom: "16px" }}>Project not found</h2>
+            <p style={{ color: "var(--muted)", marginBottom: "32px" }}>
+              The project you are looking for does not exist or may have been removed.
+            </p>
+            <a href="#/portfolio" className="btn btn-primary">← Back to Portfolio</a>
+          </div>
+        </section>
+        <Footer />
+      </div>
+    );
+  }
+
+  const meta = [project.category, project.year, project.location].filter(Boolean);
+  const body = project.fullDesc || project.shortDesc;
+  const related = publishedProjects.filter((p) => p.slug !== slug).slice(0, 3);
+
+  return (
+    <div className="app">
+      <Header activePath="/portfolio" />
+
+      {/* Hero / cover image */}
+      <section className="project-detail-hero">
+        <img src={project.coverUrl} alt={project.alt} className="project-detail-hero-img" />
+        <div className="project-detail-hero-overlay" />
+        <div className="container project-detail-hero-content">
+          {meta.length > 0 && (
+            <div className="project-detail-meta">
+              {meta.map((m, i) => (
+                <span key={i}>{m}</span>
+              ))}
+            </div>
+          )}
+          <h1 className="hero-step">{project.title}</h1>
+          {project.shortDesc && (
+            <p className="project-detail-hero-desc hero-step">{project.shortDesc}</p>
+          )}
+        </div>
+      </section>
+
+      {/* Body */}
+      <section className="section project-detail-body">
+        <div className="container project-detail-inner">
+          <a href="#/portfolio" className="project-detail-back">
+            ← Back to Portfolio
+          </a>
+
+          {body ? (
+            <div className="project-detail-text">
+              {body.split("\n").map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+          ) : (
+            <p className="project-detail-placeholder">
+              Details for this project will be available soon.
+            </p>
+          )}
+
+          {/* Placeholder: media/gallery block */}
+          <div className="project-detail-placeholder-section" {...reveal}>
+            <h3 className="project-detail-section-title">Gallery</h3>
+            <div className="project-detail-gallery-grid">
+              <div className="project-detail-gallery-item project-detail-placeholder-tile">
+                <span>Media coming soon</span>
+              </div>
+              <div className="project-detail-gallery-item project-detail-placeholder-tile">
+                <span>Media coming soon</span>
+              </div>
+              <div className="project-detail-gallery-item project-detail-placeholder-tile">
+                <span>Media coming soon</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Placeholder: video/showcase block */}
+          <div className="project-detail-placeholder-section" {...reveal}>
+            <h3 className="project-detail-section-title">Video Showcase</h3>
+            <div className="project-detail-video-placeholder">
+              <span className="project-detail-video-play">▷</span>
+              <span>Video showcase coming soon</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Related projects */}
+      {related.length > 0 && (
+        <section className="section project-detail-related">
+          <div className="container">
+            <div className="section-head" {...reveal}>
+              <span className="eyebrow">More work</span>
+              <h2 className="section-title">Related Projects</h2>
+            </div>
+            <div className="portfolio-grid">
+              {related.map((p, i) => (
+                <a href={`#/portfolio/project/${p.slug}`} className="pfolio-card" key={p.id} {...reveal} style={delayStyle(i * 80)}>
+                  <div className="pfolio-card-img">
+                    <img src={p.coverUrl} alt={p.alt} loading="lazy" className="card-img" />
+                    <div className="pfolio-card-overlay" />
+                    <span className="pfolio-card-arrow">↗</span>
+                  </div>
+                  <div className="pfolio-card-body">
+                    <span className="pfolio-card-cat">{p.category}</span>
+                    <h3>{p.title}</h3>
+                    <span className="pfolio-card-year">{p.year}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <Footer />
+    </div>
   );
 }

@@ -14,13 +14,19 @@ import type {
   AdminSession,
   ActivityEntry,
   AnalyticsSnapshot,
+  ContactSubmission,
   CmsClient,
   CmsMedia,
   CmsProject,
+  PageContentRow,
+  PageKey,
   SiteSettings,
+  SubmissionStatus,
 } from "./types";
+import { safeParsePageContent, type LandingContent, type AboutContent, type ServicesContent, type ContactContent } from "./pageSchemas";
+import { defaultPageContents } from "./defaultContent";
 
-interface CmsContextValue {
+export interface CmsContextValue {
   repo: SupabaseRepository;
   /* data */
   projects: CmsProject[];
@@ -30,9 +36,15 @@ interface CmsContextValue {
   activities: ActivityEntry[];
   analytics: AnalyticsSnapshot;
   auth: AdminSession | null;
+  pageContents: Record<PageKey, { draft: PageContentRow | null; published: PageContentRow | null }>;
+  submissions: ContactSubmission[];
   /* derived for public pages */
   publishedClients: CmsClient[];
   publishedProjects: CmsProject[];
+  landingContent: LandingContent;
+  aboutContent: AboutContent;
+  servicesContent: ServicesContent;
+  contactContent: ContactContent;
   /* loading / error */
   loading: boolean;
   error: string | null;
@@ -50,6 +62,12 @@ interface CmsContextValue {
   addMedia: (m: CmsMedia) => Promise<void>;
   updateMedia: (id: string, patch: Partial<CmsMedia>) => Promise<void>;
   deleteMedia: (id: string) => Promise<void>;
+  /* page content */
+  savePageDraft: (pageKey: PageKey, content: unknown) => Promise<void>;
+  publishPage: (pageKey: PageKey) => Promise<void>;
+  /* contact submissions */
+  updateSubmission: (id: string, patch: { status?: SubmissionStatus; adminNotes?: string }) => Promise<void>;
+  deleteSubmission: (id: string) => Promise<void>;
   /* auth */
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -57,7 +75,7 @@ interface CmsContextValue {
   reload: () => Promise<void>;
 }
 
-const CmsContext = createContext<CmsContextValue | null>(null);
+export const CmsContext = createContext<CmsContextValue | null>(null);
 
 function uid(): string {
   return crypto.randomUUID();
@@ -74,6 +92,13 @@ export function CmsProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [auth, setAuth] = useState<AdminSession | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsSnapshot>(() => defaultAnalytics());
+  const [pageContents, setPageContents] = useState<Record<PageKey, { draft: PageContentRow | null; published: PageContentRow | null }>>({
+    landing: { draft: null, published: null },
+    about: { draft: null, published: null },
+    services: { draft: null, published: null },
+    contact: { draft: null, published: null },
+  });
+  const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +120,22 @@ export function CmsProvider({ children }: { children: ReactNode }) {
       setMedia(mediaData);
       setActivities(activitiesData);
       setAuth(authData);
+
+      const pageKeys: PageKey[] = ["landing", "about", "services", "contact"];
+      const pageData = await Promise.all(
+        pageKeys.map(async (k) => {
+          const [draft, published] = await Promise.all([
+            repo.getPageContent(k, "draft"),
+            repo.getPageContent(k, "published"),
+          ]);
+          return [k, { draft, published }] as const;
+        }),
+      );
+      setPageContents(Object.fromEntries(pageData) as Record<PageKey, { draft: PageContentRow | null; published: PageContentRow | null }>);
+
+      const submissionsData = await repo.getSubmissions();
+      setSubmissions(submissionsData);
+
       const analyticsData = await repo.getAnalytics(projectsData, mediaData);
       setAnalytics(analyticsData);
     } catch (err) {
@@ -142,6 +183,35 @@ export function CmsProvider({ children }: { children: ReactNode }) {
     () => projects.filter((p) => p.status === "published"),
     [projects],
   );
+
+  /* Parse published page content with fallback to defaults */
+  const landingContent = useMemo<LandingContent>(() => {
+    const raw = pageContents.landing.published?.content;
+    if (!raw) return defaultPageContents.landing;
+    const parsed = safeParsePageContent("landing", raw);
+    return parsed.success ? parsed.data : defaultPageContents.landing;
+  }, [pageContents.landing.published]);
+
+  const aboutContent = useMemo<AboutContent>(() => {
+    const raw = pageContents.about.published?.content;
+    if (!raw) return defaultPageContents.about;
+    const parsed = safeParsePageContent("about", raw);
+    return parsed.success ? parsed.data : defaultPageContents.about;
+  }, [pageContents.about.published]);
+
+  const servicesContent = useMemo<ServicesContent>(() => {
+    const raw = pageContents.services.published?.content;
+    if (!raw) return defaultPageContents.services;
+    const parsed = safeParsePageContent("services", raw);
+    return parsed.success ? parsed.data : defaultPageContents.services;
+  }, [pageContents.services.published]);
+
+  const contactContent = useMemo<ContactContent>(() => {
+    const raw = pageContents.contact.published?.content;
+    if (!raw) return defaultPageContents.contact;
+    const parsed = safeParsePageContent("contact", raw);
+    return parsed.success ? parsed.data : defaultPageContents.contact;
+  }, [pageContents.contact.published]);
 
   const createProject = useCallback(
     async (p: Omit<CmsProject, "id" | "createdAt" | "updatedAt">) => {
@@ -268,6 +338,48 @@ const project: CmsProject = {
     [repo, media, reload],
   );
 
+  const savePageDraft = useCallback(
+    async (pageKey: PageKey, content: unknown) => {
+      await repo.savePageDraft(pageKey, content);
+      const draft = await repo.getPageContent(pageKey, "draft");
+      setPageContents((prev) => ({ ...prev, [pageKey]: { ...prev[pageKey], draft } }));
+      await repo.addActivity({ type: "content", message: `Saved draft for ${pageKey} page` });
+    },
+    [repo],
+  );
+
+  const publishPage = useCallback(
+    async (pageKey: PageKey) => {
+      await repo.publishPage(pageKey);
+      const [draft, published] = await Promise.all([
+        repo.getPageContent(pageKey, "draft"),
+        repo.getPageContent(pageKey, "published"),
+      ]);
+      setPageContents((prev) => ({ ...prev, [pageKey]: { draft, published } }));
+      await repo.addActivity({ type: "content", message: `Published ${pageKey} page` });
+      await reload();
+    },
+    [repo, reload],
+  );
+
+  const updateSubmission = useCallback(
+    async (id: string, patch: { status?: SubmissionStatus; adminNotes?: string }) => {
+      await repo.updateSubmission(id, patch);
+      setSubmissions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch, updatedAt: Date.now() } : s)));
+      await repo.addActivity({ type: "inquiry", message: `Updated submission ${id.slice(0, 8)}` });
+    },
+    [repo],
+  );
+
+  const deleteSubmission = useCallback(
+    async (id: string) => {
+      await repo.deleteSubmission(id);
+      setSubmissions((prev) => prev.filter((s) => s.id !== id));
+      await repo.addActivity({ type: "inquiry", message: `Deleted submission ${id.slice(0, 8)}` });
+    },
+    [repo],
+  );
+
   const login = useCallback(
     async (email: string, password: string): Promise<boolean> => {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -313,8 +425,14 @@ const project: CmsProject = {
     activities,
     analytics,
     auth,
+    pageContents,
+    submissions,
     publishedClients,
     publishedProjects,
+    landingContent,
+    aboutContent,
+    servicesContent,
+    contactContent,
     loading,
     error,
     createProject,
@@ -327,6 +445,10 @@ const project: CmsProject = {
     addMedia,
     updateMedia,
     deleteMedia,
+    savePageDraft,
+    publishPage,
+    updateSubmission,
+    deleteSubmission,
     login,
     logout,
     reload,

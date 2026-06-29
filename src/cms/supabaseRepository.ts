@@ -4,10 +4,15 @@ import type {
   AdminSession,
   AnalyticsPoint,
   AnalyticsSnapshot,
+  ContactSubmission,
   CmsClient,
   CmsMedia,
   CmsProject,
+  ContentStage,
+  PageContentRow,
+  PageKey,
   SiteSettings,
+  SubmissionStatus,
 } from "./types";
 import type { CmsRepository, UploadResult } from "./repository";
 import { mapProject, mapClient, mapMedia } from "./mappers";
@@ -376,6 +381,124 @@ export class SupabaseRepository implements CmsRepository {
     };
   }
 
+  /* ---- Page content ---- */
+
+  async getPageContent(pageKey: PageKey, stage: ContentStage): Promise<PageContentRow | null> {
+    const { data, error } = await supabase
+      .from("page_content")
+      .select("*")
+      .eq("page_key", pageKey)
+      .eq("stage", stage)
+      .single();
+    if (error) {
+      if (error.code === "PGRST116") return null;
+      throw error;
+    }
+    const row = data as Row;
+    return {
+      pageKey: row.page_key as PageKey,
+      stage: row.stage as ContentStage,
+      content: row.content,
+      updatedAt: new Date(row.updated_at as string).getTime(),
+      updatedBy: (row.updated_by as string) ?? null,
+    };
+  }
+
+  async savePageDraft(pageKey: PageKey, content: unknown): Promise<void> {
+    const { data: session } = await supabase.auth.getSession();
+    const email = session?.session?.user?.email ?? null;
+    const { error } = await supabase
+      .from("page_content")
+      .upsert({
+        page_key: pageKey,
+        stage: "draft",
+        content,
+        updated_by: email,
+      } as never);
+    if (error) throw error;
+  }
+
+  async publishPage(pageKey: PageKey): Promise<void> {
+    const { data: draftRow, error: draftErr } = await supabase
+      .from("page_content")
+      .select("content")
+      .eq("page_key", pageKey)
+      .eq("stage", "draft")
+      .single();
+    if (draftErr) throw draftErr;
+    const { data: session } = await supabase.auth.getSession();
+    const email = session?.session?.user?.email ?? null;
+    const { error } = await supabase
+      .from("page_content")
+      .upsert({
+        page_key: pageKey,
+        stage: "published",
+        content: (draftRow as Row).content,
+        updated_by: email,
+      } as never);
+    if (error) throw error;
+  }
+
+  async getAllPageContent(stage: ContentStage): Promise<PageContentRow[]> {
+    const { data, error } = await supabase
+      .from("page_content")
+      .select("*")
+      .eq("stage", stage);
+    if (error) throw error;
+    return ((data as Row[] | null) ?? []).map((row) => ({
+      pageKey: row.page_key as PageKey,
+      stage: row.stage as ContentStage,
+      content: row.content,
+      updatedAt: new Date(row.updated_at as string).getTime(),
+      updatedBy: (row.updated_by as string) ?? null,
+    }));
+  }
+
+  /* ---- Contact submissions ---- */
+
+  async getSubmissions(status?: SubmissionStatus): Promise<ContactSubmission[]> {
+    let query = supabase
+      .from("contact_submissions")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (status) query = query.eq("status", status);
+    const { data, error } = await query;
+    if (error) throw error;
+    return ((data as Row[] | null) ?? []).map(mapSubmission);
+  }
+
+  async getSubmission(id: string): Promise<ContactSubmission | null> {
+    const { data, error } = await supabase
+      .from("contact_submissions")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) {
+      if (error.code === "PGRST116") return null;
+      throw error;
+    }
+    return mapSubmission(data as Row);
+  }
+
+  async updateSubmission(id: string, patch: { status?: SubmissionStatus; adminNotes?: string }): Promise<void> {
+    const update: Record<string, unknown> = {};
+    if (patch.status !== undefined) update.status = patch.status;
+    if (patch.adminNotes !== undefined) update.admin_notes = patch.adminNotes;
+    const { error } = await supabase
+      .from("contact_submissions")
+      .update(update as never)
+      .eq("id", id);
+    if (error) throw error;
+  }
+
+  async deleteSubmission(id: string): Promise<void> {
+    const { error } = await supabase
+      .from("contact_submissions")
+      .delete()
+      .eq("id", id);
+    if (error) throw error;
+  }
+
   /* ---- Activity ---- */
 
   async getActivity(): Promise<ActivityEntry[]> {
@@ -401,6 +524,38 @@ export class SupabaseRepository implements CmsRepository {
       message: entry.message,
     } as never);
   }
+}
+
+/* ---------- Helpers ---------- */
+
+function mapSubmission(row: Row): ContactSubmission {
+  const formData = (row.form_data as Record<string, unknown>) ?? {};
+  return {
+    id: row.id as string,
+    fullName: row.full_name as string,
+    email: row.email as string,
+    countryCode: (formData.countryCode as string) ?? (row.phone_area as string) ?? "+60",
+    phoneNumber: (row.phone_number as string) ?? "",
+    organisationType: (formData.organisationType as string) ?? "",
+    organisation: (row.organisation as string) ?? "",
+    project: (row.project as string) ?? "",
+    budget: (row.budget as string) ?? "",
+    requestTypes: (row.request_types as string[]) ?? [],
+    requestTypeOther: (row.request_type_other as string) ?? "",
+    exemption: (row.exemption as string) ?? "",
+    eventDate: (row.event_date as string) ?? "",
+    inquiry: (row.inquiry as string) ?? "",
+    hearAbout: (row.hear_about as string) ?? "",
+    hearAboutOther: (row.hear_about_other as string) ?? "",
+    referral: (row.referral as string) ?? "",
+    promo: (row.promo as string) ?? "",
+    formData,
+    attachmentPath: (row.attachment_path as string) ?? null,
+    status: row.status as ContactSubmission["status"],
+    adminNotes: (row.admin_notes as string) ?? "",
+    createdAt: new Date(row.created_at as string).getTime(),
+    updatedAt: new Date(row.updated_at as string).getTime(),
+  };
 }
 
 /* ---------- Singleton ---------- */

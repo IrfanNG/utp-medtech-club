@@ -67,7 +67,7 @@ export interface ContentSlice {
 
 export interface ActivityEntry {
   id: string;
-  type: "project" | "media" | "client" | "settings" | "auth";
+  type: "project" | "media" | "client" | "settings" | "auth" | "content" | "inquiry";
   message: string;
   timestamp: number;
 }
@@ -89,4 +89,48 @@ export interface AnalyticsSnapshot {
 export interface AdminSession {
   email: string;
   loginAt: number;
+}
+
+/* ---------- Page content (draft/published) ---------- */
+
+export type PageKey = "landing" | "about" | "services" | "contact";
+export type ContentStage = "draft" | "published";
+
+export interface PageContentRow {
+  pageKey: PageKey;
+  stage: ContentStage;
+  content: unknown;
+  updatedAt: number;
+  updatedBy: string | null;
+}
+
+/* ---------- Contact submissions ---------- */
+
+export type SubmissionStatus = "new" | "in_progress" | "resolved" | "spam";
+
+export interface ContactSubmission {
+  id: string;
+  fullName: string;
+  email: string;
+  countryCode: string;
+  phoneNumber: string;
+  organisationType: string;
+  organisation: string;
+  project: string;
+  budget: string;
+  requestTypes: string[];
+  requestTypeOther: string;
+  exemption: string;
+  eventDate: string;
+  inquiry: string;
+  hearAbout: string;
+  hearAboutOther: string;
+  referral: string;
+  promo?: string;
+  formData: Record<string, unknown>;
+  attachmentPath: string | null;
+  status: SubmissionStatus;
+  adminNotes: string;
+  createdAt: number;
+  updatedAt: number;
 }

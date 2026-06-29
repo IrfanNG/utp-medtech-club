@@ -3,14 +3,17 @@ import { supabase } from "../lib/supabase";
 import { useCms } from "../cms/CmsContext";
 import { usePageTitle } from "../shared";
 import { AdminLayout } from "./AdminLayout";
-import { AdminIcon } from "./AdminIcons";
 import { AdminLogin } from "./Login";
 import { Dashboard } from "./Dashboard";
 import { ProjectsAdmin } from "./ProjectsAdmin";
 import { MediaAdmin } from "./MediaAdmin";
 import { ClientsAdmin } from "./ClientsAdmin";
 import { SettingsAdmin } from "./SettingsAdmin";
-import { ComingSoon } from "./ComingSoon";
+import { LandingEditor } from "./LandingEditor";
+import { AboutEditor } from "./AboutEditor";
+import { ServicesEditor } from "./ServicesEditor";
+import { ContactEditor } from "./ContactEditor";
+import { SubmissionsInbox } from "./SubmissionsInbox";
 
 interface AdminAppProps {
   path: string;
@@ -26,6 +29,7 @@ const adminTitles: Record<string, string> = {
   "/admin/about-content": "About Us — UTP Medtech Admin",
   "/admin/services": "Services — UTP Medtech Admin",
   "/admin/contact-content": "Contact — UTP Medtech Admin",
+  "/admin/submissions": "Submissions — UTP Medtech Admin",
 };
 
 export function AdminApp({ path }: AdminAppProps) {
@@ -77,13 +81,15 @@ export function AdminApp({ path }: AdminAppProps) {
   } else if (path === "/admin/settings") {
     content = <SettingsAdmin />;
   } else if (path === "/admin/landing") {
-    content = <ComingSoon title="Landing Page Editor" icon={AdminIcon.pages({ size: 48 })} description="Drag-and-drop section ordering and content editing for the home page." />;
+    content = <LandingEditor />;
   } else if (path === "/admin/about-content") {
-    content = <ComingSoon title="About Us Editor" icon={AdminIcon.about({ size: 48 })} description="Edit the about page hero, gallery, team members, and philosophy content." />;
+    content = <AboutEditor />;
   } else if (path === "/admin/services") {
-    content = <ComingSoon title="Services Editor" icon={AdminIcon.services({ size: 48 })} description="Manage service panels, descriptions, images, and ordering." />;
+    content = <ServicesEditor />;
   } else if (path === "/admin/contact-content") {
-    content = <ComingSoon title="Contact Page Editor" icon={AdminIcon.contact({ size: 48 })} description="Configure the contact form fields, hero content, and clients section." />;
+    content = <ContactEditor />;
+  } else if (path === "/admin/submissions") {
+    content = <SubmissionsInbox />;
   } else {
     content = <Dashboard />;
   }
