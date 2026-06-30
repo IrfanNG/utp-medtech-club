@@ -499,6 +499,15 @@ export class SupabaseRepository implements CmsRepository {
     if (error) throw error;
   }
 
+  async getAttachmentUrl(path: string): Promise<string | null> {
+    if (!path) return null;
+    const { data, error } = await supabase.storage
+      .from("contact-attachments")
+      .createSignedUrl(path, 300);
+    if (error) return null;
+    return data?.signedUrl ?? null;
+  }
+
   /* ---- Activity ---- */
 
   async getActivity(): Promise<ActivityEntry[]> {
@@ -534,9 +543,14 @@ function mapSubmission(row: Row): ContactSubmission {
     id: row.id as string,
     fullName: row.full_name as string,
     email: row.email as string,
-    countryCode: (formData.countryCode as string) ?? (row.phone_area as string) ?? "+60",
+    countryCode:
+      (row.country_code as string) ||
+      (formData.countryCode as string) ||
+      (row.phone_area as string) ||
+      "+60",
     phoneNumber: (row.phone_number as string) ?? "",
-    organisationType: (formData.organisationType as string) ?? "",
+    organisationType:
+      (row.organisation_type as string) || (formData.organisationType as string) || "",
     organisation: (row.organisation as string) ?? "",
     project: (row.project as string) ?? "",
     budget: (row.budget as string) ?? "",
@@ -548,7 +562,6 @@ function mapSubmission(row: Row): ContactSubmission {
     hearAbout: (row.hear_about as string) ?? "",
     hearAboutOther: (row.hear_about_other as string) ?? "",
     referral: (row.referral as string) ?? "",
-    promo: (row.promo as string) ?? "",
     formData,
     attachmentPath: (row.attachment_path as string) ?? null,
     status: row.status as ContactSubmission["status"],

@@ -68,6 +68,7 @@ export interface CmsContextValue {
   /* contact submissions */
   updateSubmission: (id: string, patch: { status?: SubmissionStatus; adminNotes?: string }) => Promise<void>;
   deleteSubmission: (id: string) => Promise<void>;
+  getAttachmentUrl: (path: string) => Promise<string | null>;
   /* auth */
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -380,6 +381,11 @@ const project: CmsProject = {
     [repo],
   );
 
+  const getAttachmentUrl = useCallback(
+    (path: string) => repo.getAttachmentUrl(path),
+    [repo],
+  );
+
   const login = useCallback(
     async (email: string, password: string): Promise<boolean> => {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -449,6 +455,7 @@ const project: CmsProject = {
     publishPage,
     updateSubmission,
     deleteSubmission,
+    getAttachmentUrl,
     login,
     logout,
     reload,

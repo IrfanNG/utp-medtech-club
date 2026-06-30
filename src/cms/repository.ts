@@ -57,4 +57,5 @@ export interface CmsRepository {
   getSubmission(id: string): Promise<ContactSubmission | null>;
   updateSubmission(id: string, patch: { status?: SubmissionStatus; adminNotes?: string }): Promise<void>;
   deleteSubmission(id: string): Promise<void>;
+  getAttachmentUrl(path: string): Promise<string | null>;
 }

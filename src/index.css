@@ -1740,8 +1740,38 @@ h1, h2, h3, h4 {
 .form-submit {
   grid-column: 1 / -1;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
   margin-top: 36px;
+}
+.form-captcha {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 65px;
+}
+.cf-turnstile-container {
+  display: flex;
+  justify-content: center;
+}
+.cf-turnstile-failed {
+  max-width: 300px;
+  padding: 16px 20px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: rgba(255, 26, 15, 0.12);
+  text-align: center;
+}
+.cf-turnstile-failed-text {
+  color: #ffd9d6;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.form-captcha-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.02em;
 }
 .btn-submit {
   padding: 16px 64px;
@@ -1753,6 +1783,9 @@ h1, h2, h3, h4 {
 }
 
 /* form success */
+.form-feedback-anchor {
+  scroll-margin-top: 120px;
+}
 .form-success {
   background: rgba(255, 26, 15, 0.12);
   border: 1px solid var(--accent);

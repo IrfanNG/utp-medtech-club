@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useState, type FormEvent } from "react";
+import { cloneElement, isValidElement, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Icon,
   delayStyle,
@@ -8,6 +8,9 @@ import {
 } from "./shared";
 import { Footer, Header } from "./Chrome";
 import { useCms } from "./cms/CmsContext";
+import { Turnstile } from "./Turnstile";
+
+const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string) || "";
 
 const COUNTRY_CODES = [
   { value: "+60", label: "Malaysia (+60)" },
@@ -20,6 +23,28 @@ const COUNTRY_CODES = [
   { value: "+91", label: "India (+91)" },
   { value: "+61", label: "Australia (+61)" },
 ];
+
+const IDEMPOTENCY_KEY = "mtc.pendingIdempotencyKey";
+
+function getOrCreateIdempotencyKey(): string {
+  try {
+    const existing = sessionStorage.getItem(IDEMPOTENCY_KEY);
+    if (existing) return existing;
+    const fresh = crypto.randomUUID();
+    sessionStorage.setItem(IDEMPOTENCY_KEY, fresh);
+    return fresh;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+function clearIdempotencyKey(): void {
+  try {
+    sessionStorage.removeItem(IDEMPOTENCY_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export default function Contact() {
   const { settings } = useCms();
@@ -35,6 +60,7 @@ export default function Contact() {
 
 function ContactContent() {
   const { contactContent } = useCms();
+  const feedbackAnchorRef = useRef<HTMLDivElement | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -43,6 +69,25 @@ function ContactContent() {
   const [hearOtherOpen, setHearOtherOpen] = useState(false);
   const [fileName, setFileName] = useState("");
   const [fileError, setFileError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileReset, setTurnstileReset] = useState(0);
+  const turnstileEnabled = !!TURNSTILE_SITE_KEY;
+  const turnstileReady = !turnstileEnabled || !!turnstileToken;
+  const resetTurnstile = () => {
+    setTurnstileToken("");
+    setTurnstileReset((n) => n + 1);
+  };
+
+  useEffect(() => {
+    if ((!submitted && !submitError) || !feedbackAnchorRef.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      feedbackAnchorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [submitted, submitError]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,13 +96,17 @@ function ContactContent() {
       form.reportValidity();
       return;
     }
+    if (turnstileEnabled && !turnstileToken) {
+      setSubmitError("Please complete the captcha above before submitting.");
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError("");
 
     try {
       const formData = new FormData(form);
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = getOrCreateIdempotencyKey();
       const requestTypes = formData.getAll("requestType").map(String);
       const requestHasOther = requestTypes.includes("Other");
       const rawBudget = String(formData.get("budget") || "").trim();
@@ -81,19 +130,28 @@ function ContactContent() {
         hearAbout: formData.get("hearAbout"),
         hearAboutOther: formData.get("hearAboutOther") || "",
         referral: formData.get("referral") || "",
+        website: formData.get("website") || "",
+        turnstileToken: turnstileToken || "",
       };
 
       const file = (form.querySelector('[name="attachment"]') as HTMLInputElement)?.files?.[0];
-      if (file) {
-        formData.set("attachment", file);
-        body.attachment = file.name;
-      }
 
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      let res: Response;
+      if (file) {
+        // Real attachment: send multipart with the JSON payload in a `payload`
+        // field and the file in an `attachment` field. The server uploads the
+        // file to the private contact-attachments bucket and stores its path.
+        const multipart = new FormData();
+        multipart.set("payload", JSON.stringify(body));
+        multipart.set("attachment", file);
+        res = await fetch("/api/contact", { method: "POST", body: multipart });
+      } else {
+        res = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
 
       if (!res.ok) {
         const errBody = (await res.json()) as { error?: string };
@@ -108,11 +166,14 @@ function ContactContent() {
       setRequestTypeSelection([]);
       setHearOtherOpen(false);
       setFileName("");
+      clearIdempotencyKey();
+      resetTurnstile();
       window.setTimeout(() => setSubmitted(false), 6000);
     } catch {
       setSubmitError("Network error. Please try again.");
     } finally {
       setSubmitting(false);
+      resetTurnstile();
     }
   };
 
@@ -179,6 +240,8 @@ function ContactContent() {
               </div>
             </div>
 
+            <div ref={feedbackAnchorRef} className="form-feedback-anchor" />
+
             {submitted && (
               <div className="form-success" role="alert">
                 {contactContent.successMessage}
@@ -196,13 +259,13 @@ function ContactContent() {
               <div className="form-col">
                 {contactContent.fields.fullName?.enabled && (
                   <Field label={contactContent.fields.fullName.label} required={contactContent.fields.fullName.required}>
-                    <input type="text" name="fullName" placeholder={contactContent.fields.fullName.placeholder} required={contactContent.fields.fullName.required} />
+                    <input type="text" name="fullName" placeholder={contactContent.fields.fullName.placeholder} required={contactContent.fields.fullName.required} maxLength={120} />
                   </Field>
                 )}
 
                 {contactContent.fields.email?.enabled && (
                   <Field label={contactContent.fields.email.label} required={contactContent.fields.email.required}>
-                    <input type="email" name="email" placeholder={contactContent.fields.email.placeholder} required={contactContent.fields.email.required} />
+                    <input type="email" name="email" placeholder={contactContent.fields.email.placeholder} required={contactContent.fields.email.required} maxLength={254} />
                   </Field>
                 )}
 
@@ -221,7 +284,7 @@ function ContactContent() {
                           ))}
                         </select>
                       )}
-                      <input type="tel" name="phoneNumber" placeholder="123456789" inputMode="numeric" required={contactContent.fields.phone.required} aria-label="Phone number" />
+                      <input type="tel" name="phoneNumber" placeholder="123456789" inputMode="numeric" required={contactContent.fields.phone.required} aria-label="Phone number" maxLength={32} />
                     </div>
                   </Field>
                 )}
@@ -248,13 +311,13 @@ function ContactContent() {
 
                 {contactContent.fields.organisation?.enabled && (
                   <Field label={contactContent.fields.organisation.label} required={contactContent.fields.organisation.required}>
-                    <input type="text" name="organisation" placeholder={contactContent.fields.organisation.placeholder} required={contactContent.fields.organisation.required} />
+                    <input type="text" name="organisation" placeholder={contactContent.fields.organisation.placeholder} required={contactContent.fields.organisation.required} maxLength={200} />
                   </Field>
                 )}
 
                 {contactContent.fields.project?.enabled && (
                   <Field label={contactContent.fields.project.label} required={contactContent.fields.project.required}>
-                    <input type="text" name="project" placeholder={contactContent.fields.project.placeholder} required={contactContent.fields.project.required} />
+                    <input type="text" name="project" placeholder={contactContent.fields.project.placeholder} required={contactContent.fields.project.required} maxLength={200} />
                   </Field>
                 )}
 
@@ -262,7 +325,7 @@ function ContactContent() {
                   <Field label={contactContent.fields.budget.label} required={contactContent.fields.budget.required}>
                     <div className="money-input">
                       <span>RM</span>
-                      <input type="text" name="budget" placeholder={contactContent.fields.budget.placeholder} required={contactContent.fields.budget.required} />
+                      <input type="text" name="budget" placeholder={contactContent.fields.budget.placeholder} required={contactContent.fields.budget.required} maxLength={60} />
                     </div>
                   </Field>
                 )}
@@ -287,7 +350,7 @@ function ContactContent() {
                       ))}
                     </div>
                     {requestHasOther && (
-                      <input type="text" name="requestTypeOther" placeholder="Please specify" className="other-input" required />
+                      <input type="text" name="requestTypeOther" placeholder="Please specify" className="other-input" required maxLength={500} />
                     )}
                   </Field>
                 )}
@@ -316,7 +379,7 @@ function ContactContent() {
               <div className="form-col">
                 {contactContent.fields.inquiry?.enabled && (
                   <Field label={contactContent.fields.inquiry.label} required={contactContent.fields.inquiry.required}>
-                    <textarea name="inquiry" rows={6} placeholder={contactContent.fields.inquiry.placeholder} required={contactContent.fields.inquiry.required} />
+                    <textarea name="inquiry" rows={6} placeholder={contactContent.fields.inquiry.placeholder} required={contactContent.fields.inquiry.required} maxLength={4000} />
                   </Field>
                 )}
 
@@ -351,22 +414,42 @@ function ContactContent() {
                       ))}
                     </div>
                     {hearOtherOpen && (
-                      <input type="text" name="hearAboutOther" placeholder="Please specify" className="other-input" />
+                      <input type="text" name="hearAboutOther" placeholder="Please specify" className="other-input" maxLength={500} />
                     )}
                   </Field>
                 )}
 
                 {contactContent.fields.referral?.enabled && (
                   <Field label={contactContent.fields.referral.label}>
-                    <input type="text" name="referral" placeholder={contactContent.fields.referral.placeholder} />
+                    <input type="text" name="referral" placeholder={contactContent.fields.referral.placeholder} maxLength={120} />
                   </Field>
                 )}
+
+                {/* Honeypot: visually hidden, real users never fill it. */}
+                <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", top: "auto", width: 1, height: 1, overflow: "hidden" }}>
+                  <label>Website (leave blank)</label>
+                  <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+                </div>
               </div>
 
               <div className="form-submit">
-                <button type="submit" className="btn btn-primary btn-submit" disabled={submitting}>
+                {turnstileEnabled && (
+                  <div className="form-captcha">
+                    <Turnstile
+                      key={turnstileReset}
+                      siteKey={TURNSTILE_SITE_KEY}
+                      onToken={setTurnstileToken}
+                      onExpire={() => setTurnstileToken("")}
+                      onError={() => setTurnstileToken("")}
+                    />
+                  </div>
+                )}
+                <button type="submit" className="btn btn-primary btn-submit" disabled={submitting || !turnstileReady}>
                   {submitting ? "SUBMITTING…" : "SUBMIT"}
                 </button>
+                {turnstileEnabled && !turnstileReady && !submitError && (
+                  <span className="form-captcha-hint">Complete the captcha above to submit.</span>
+                )}
               </div>
             </form>
           </div>

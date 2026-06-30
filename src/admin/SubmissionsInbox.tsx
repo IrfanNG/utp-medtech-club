@@ -5,13 +5,15 @@ import { Modal, ConfirmDialog, useToast } from "./AdminUI";
 import type { ContactSubmission, SubmissionStatus } from "../cms/types";
 
 export function SubmissionsInbox() {
-  const { submissions, updateSubmission, deleteSubmission } = useCms();
+  const { submissions, updateSubmission, deleteSubmission, getAttachmentUrl } = useCms();
   const { toast } = useToast();
   const [filter, setFilter] = useState<SubmissionStatus | "all">("all");
   const [selected, setSelected] = useState<ContactSubmission | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ContactSubmission | null>(null);
   const [saving, setSaving] = useState(false);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [attachmentLoading, setAttachmentLoading] = useState(false);
 
   const filtered = useMemo(() => {
     if (filter === "all") return submissions;
@@ -29,6 +31,24 @@ export function SubmissionsInbox() {
   const openDetail = (s: ContactSubmission) => {
     setSelected(s);
     setAdminNotes(s.adminNotes);
+    setAttachmentUrl(null);
+    setAttachmentUrlState(s);
+  };
+
+  const setAttachmentUrlState = async (s: ContactSubmission) => {
+    if (!s.attachmentPath) {
+      setAttachmentUrl(null);
+      return;
+    }
+    setAttachmentLoading(true);
+    try {
+      const url = await getAttachmentUrl(s.attachmentPath);
+      setAttachmentUrl(url);
+    } catch {
+      setAttachmentUrl(null);
+    } finally {
+      setAttachmentLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -245,7 +265,13 @@ export function SubmissionsInbox() {
               {selected.attachmentPath && (
                 <div className="adm-detail-field">
                   <label>Attachment</label>
-                  <a href={selected.attachmentPath} target="_blank" rel="noopener noreferrer">View file</a>
+                  {attachmentLoading ? (
+                    <span className="adm-muted">Preparing download…</span>
+                  ) : attachmentUrl ? (
+                    <a href={attachmentUrl} target="_blank" rel="noopener noreferrer">View file</a>
+                  ) : (
+                    <span className="adm-muted">File unavailable</span>
+                  )}
                 </div>
               )}
               <div className="adm-detail-field adm-detail-full">

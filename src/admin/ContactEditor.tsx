@@ -97,7 +97,7 @@ export function ContactEditor() {
                 </div>
                 <p className="adm-card-sub">Adjust labels, placeholders, and visibility for each field.</p>
               </div>
-              {Object.entries(content.fields).filter(([key]) => key !== "promo").map(([key, field]) => (
+              {Object.entries(content.fields).map(([key, field]) => (
                 <div key={key} className="adm-contact-field-card">
                   <button
                     type="button"

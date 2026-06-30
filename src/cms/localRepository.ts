@@ -275,6 +275,11 @@ export class LocalRepository implements CmsRepository {
     const list = readJson<ContactSubmission[]>("mtc.submissions", []);
     writeJson("mtc.submissions", list.filter((s) => s.id !== id));
   }
+
+  async getAttachmentUrl(_path: string): Promise<string | null> {
+    // Local dev has no real object storage; submissions carry no real files.
+    return null;
+  }
 }
 
 /* ---------- Singleton ---------- */
