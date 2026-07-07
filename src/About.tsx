@@ -8,7 +8,13 @@ import {
 } from "./shared";
 import { Footer, Header } from "./Chrome";
 import { useCms } from "./cms/CmsContext";
+import { ProgramShowcaseGallery } from "./ProgramShowcaseGallery";
 import type { AboutGalleryItem } from "./cms/pageSchemas";
+
+const EXCLUDED_PROGRAM_GALLERY_IMAGES = new Set([
+  "/media/about/sukmed-24/schedule1.png",
+  "/media/about/sukmed-24/schedule2.png",
+]);
 
 export default function About() {
   const { settings } = useCms();
@@ -183,7 +189,12 @@ export function ProgramDetail({ slug }: { slug: string }) {
 
   const detailTitle = program.detailTitle || program.label;
   const detailBody = program.detailBody;
-  const detailGallery = program.detailGallery.filter(Boolean);
+  const detailGallery = program.detailGallery.filter(
+    (src): src is string =>
+      Boolean(src) &&
+      src !== program.img &&
+      !EXCLUDED_PROGRAM_GALLERY_IMAGES.has(src),
+  );
   const meta = [
     program.detailCategory,
     program.detailDate,
@@ -232,13 +243,7 @@ export function ProgramDetail({ slug }: { slug: string }) {
           {detailGallery.length > 0 && (
             <div className="program-detail-gallery" {...reveal}>
               <h3 className="program-detail-section-title">Gallery</h3>
-              <div className="program-detail-gallery-grid">
-                {detailGallery.map((img, i) => (
-                  <div className="program-detail-gallery-item" key={i} {...reveal} style={delayStyle(i * 80)}>
-                    <img src={img} alt={`${detailTitle} — image ${i + 1}`} loading="lazy" className="card-img" />
-                  </div>
-                ))}
-              </div>
+              <ProgramShowcaseGallery images={detailGallery} altPrefix={detailTitle} title={detailTitle} meta={meta} />
             </div>
           )}
 
