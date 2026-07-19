@@ -1,11 +1,12 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useCms } from "../cms/CmsContext";
-import type { CmsClient } from "../cms/types";
+import type { CmsClient, CmsMedia, MediaKind } from "../cms/types";
+import type { SupabaseRepository } from "../cms/supabaseRepository";
 import { AdminIcon } from "./AdminIcons";
 import { ConfirmDialog, EmptyState, Modal, useToast } from "./AdminUI";
 
 export function ClientsAdmin() {
-  const { clients, createClient, updateClient, deleteClient } = useCms();
+  const { clients, media, repo, addMedia, createClient, updateClient, deleteClient } = useCms();
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
@@ -162,7 +163,11 @@ export function ClientsAdmin() {
                     </td>
                     <td>
                       <div className="adm-client-name">
-                        <span className="adm-client-circle">{c.name.slice(0, 2)}</span>
+                        {c.logoMedia ? (
+                          <img src={c.logoMedia} alt="" className="adm-client-logo-thumb" loading="lazy" />
+                        ) : (
+                          <span className="adm-client-circle">{c.name.slice(0, 2)}</span>
+                        )}
                         <strong>{c.name}</strong>
                       </div>
                     </td>
@@ -219,6 +224,10 @@ export function ClientsAdmin() {
           key={editing?.id ?? "new"}
           initial={editing}
           nextOrder={Math.max(...clients.map((c) => c.order), -1) + 1}
+          media={media}
+          repo={repo}
+          addMedia={addMedia}
+          toast={toast}
           onSubmit={handleSubmit}
           saving={saving}
         />
@@ -240,11 +249,19 @@ export function ClientsAdmin() {
 function ClientForm({
   initial,
   nextOrder,
+  media,
+  repo,
+  addMedia,
+  toast,
   onSubmit,
   saving,
 }: {
   initial: CmsClient | null;
   nextOrder: number;
+  media: CmsMedia[];
+  repo: SupabaseRepository;
+  addMedia: (m: CmsMedia) => Promise<void>;
+  toast: (message: string, kind?: "success" | "error" | "info") => void;
   onSubmit: (data: Omit<CmsClient, "id">) => void;
   saving: boolean;
 }) {
@@ -286,27 +303,27 @@ function ClientForm({
         {error && <span className="adm-field-error">{error}</span>}
       </div>
 
-      <div className="adm-form-row">
-        <div className="adm-form-field">
-          <label htmlFor="cf-website">Website URL</label>
-          <input
-            id="cf-website"
-            type="url"
-            value={websiteUrl}
-            onChange={(e) => setWebsiteUrl(e.target.value)}
-            placeholder="https://example.com"
-          />
-        </div>
-        <div className="adm-form-field">
-          <label htmlFor="cf-logo">Logo Media</label>
-          <input
-            id="cf-logo"
-            type="text"
-            value={logoMedia}
-            onChange={(e) => setLogoMedia(e.target.value)}
-            placeholder="Media ID (optional)"
-          />
-        </div>
+      <div className="adm-form-field">
+        <label htmlFor="cf-website">Website URL</label>
+        <input
+          id="cf-website"
+          type="url"
+          value={websiteUrl}
+          onChange={(e) => setWebsiteUrl(e.target.value)}
+          placeholder="https://example.com"
+        />
+      </div>
+
+      <div className="adm-form-field">
+        <label>Logo</label>
+        <LogoPicker
+          value={logoMedia}
+          onChange={setLogoMedia}
+          media={media}
+          repo={repo}
+          addMedia={addMedia}
+          toast={toast}
+        />
       </div>
 
       <div className="adm-form-row">
@@ -332,5 +349,167 @@ function ClientForm({
       </div>
       {saving && <span className="adm-hidden" />}
     </form>
+  );
+}
+
+/* ---------- Logo Picker ---------- */
+
+function LogoPicker({
+  value,
+  onChange,
+  media,
+  repo,
+  addMedia,
+  toast,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  media: CmsMedia[];
+  repo: SupabaseRepository;
+  addMedia: (m: CmsMedia) => Promise<void>;
+  toast: (message: string, kind?: "success" | "error" | "info") => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const imageMedia = useMemo(() => media.filter((m) => m.kind === "image"), [media]);
+  const selectedMedia = imageMedia.find((m) => m.url === value) ?? null;
+
+  const handleUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.type.startsWith("image/")) {
+      toast("Please select an image file", "error");
+      return;
+    }
+    setUploading(true);
+    try {
+      const id = crypto.randomUUID();
+      const { url } = await repo.putMediaBlob(id, file);
+      const record: CmsMedia = {
+        id,
+        name: file.name,
+        kind: "image" as MediaKind,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        url,
+        storagePath: id,
+        uploadedAt: Date.now(),
+        builtin: false,
+      };
+      await addMedia(record);
+      onChange(url);
+      toast("Logo uploaded", "success");
+    } catch {
+      toast("Upload failed", "error");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="adm-logo-picker">
+      <div className="adm-logo-preview-row">
+        <div className="adm-logo-preview">
+          {value ? (
+            <img src={value} alt="Logo preview" />
+          ) : (
+            <span className="adm-logo-preview-empty" aria-hidden="true">
+              <AdminIcon.image size={22} />
+            </span>
+          )}
+        </div>
+        <div className="adm-logo-actions">
+          <button
+            type="button"
+            className="adm-btn adm-btn-ghost"
+            onClick={() => setPickerOpen(true)}
+          >
+            <AdminIcon.folderOpen size={16} /> Choose from library
+          </button>
+          <button
+            type="button"
+            className="adm-btn adm-btn-ghost"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            <AdminIcon.upload size={16} /> {uploading ? "Uploading…" : "Upload new"}
+          </button>
+          {value && (
+            <button
+              type="button"
+              className="adm-btn adm-btn-ghost adm-btn-danger-ghost"
+              onClick={() => onChange("")}
+            >
+              <AdminIcon.trash size={16} /> Remove
+            </button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => handleUpload(e.target.files)}
+          />
+        </div>
+      </div>
+
+      <div className="adm-logo-url">
+        <input
+          type="url"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="or paste an image URL"
+          aria-label="Logo URL"
+        />
+        {selectedMedia && (
+          <span className="adm-logo-source" title={selectedMedia.name}>
+            From library: {selectedMedia.name}
+          </span>
+        )}
+      </div>
+
+      <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Choose a logo" size="lg">
+        {imageMedia.length === 0 ? (
+          <EmptyState
+            icon={AdminIcon.media({ size: 48 })}
+            title="No images in your library"
+            message="Upload an image first, or use the Upload new button in the logo picker."
+          />
+        ) : (
+          <div className="adm-media-grid adm-logo-picker-grid">
+            {imageMedia.map((m) => {
+              const isSelected = m.url === value;
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  className={`adm-media-card adm-logo-pick-card${isSelected ? " is-selected" : ""}`}
+                  onClick={() => {
+                    onChange(m.url);
+                    setPickerOpen(false);
+                  }}
+                  aria-label={`Select ${m.name}`}
+                >
+                  <div className="adm-media-thumb">
+                    <img src={m.url} alt={m.name} loading="lazy" />
+                    {isSelected && (
+                      <span className="adm-logo-pick-check" aria-hidden="true">
+                        <AdminIcon.check size={18} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="adm-media-info">
+                    <span className="adm-media-name" title={m.name}>{m.name}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
+    </div>
   );
 }

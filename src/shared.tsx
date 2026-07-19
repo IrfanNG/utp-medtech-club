@@ -278,7 +278,7 @@ export function ClientTicker({
             </div>
           ))}
         </div>
-        <div className="client-ticker-track">
+        <div className="client-ticker-track" aria-hidden="true">
           {clients.map((c) => (
             <div className="client-ticker-item" key={`b-${c.id}`}>
               <ClientLogo

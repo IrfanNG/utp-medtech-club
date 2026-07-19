@@ -8,6 +8,7 @@ import { Footer, Header, SideRail } from "./Chrome";
 import { useCms } from "./cms/CmsContext";
 import { useEffect, useState } from "react";
 import type { ServiceCard } from "./cms/pageSchemas";
+import { FeaturedProjectCarousel3D } from "./components/FeaturedProjectCarousel3D";
 
 export default function Home() {
   const { settings } = useCms();
@@ -113,21 +114,10 @@ function HomeContent() {
             <span className="eyebrow">{landingContent.projectsEyebrow}</span>
             <h2 className="section-title">{landingContent.projectsHeading}</h2>
           </div>
-          <div className="projects-grid">
-            {featuredProjects.map((p, i) => (
-              <div className="project-card" key={p.id} {...reveal} style={delayStyle(i * 100)}>
-                <img src={p.coverUrl} alt={p.alt} loading="lazy" className="card-img project-img-fill" />
-                <div className="project-overlay" />
-                <div className="project-info">
-                  <div className="project-tag">{p.category}</div>
-                  <h3>{p.title}</h3>
-                  <a href={`#/portfolio/project/${p.slug}`} className="project-link">
-                    View Project <span>→</span>
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
+          <FeaturedProjectCarousel3D
+            projects={featuredProjects}
+            onSelect={(p) => { window.location.hash = `#/portfolio/project/${p.slug}`; }}
+          />
         </div>
       </section>
 
