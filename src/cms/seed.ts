@@ -4,6 +4,7 @@ import type {
   CmsProject,
   SiteSettings,
 } from "./types";
+import { defaultClientLogoPaths } from "../clientLogos";
 
 const now = () => Date.now();
 
@@ -34,7 +35,7 @@ export const seedClients: CmsClient[] = [
   id: `seed-client-${i}`,
   name,
   websiteUrl: "",
-  logoMedia: "",
+  logoMedia: defaultClientLogoPaths[name],
   published: true,
   order: i,
 }));

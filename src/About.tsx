@@ -1,9 +1,8 @@
 import {
-  Icon,
+  ClientTicker,
   delayStyle,
   reveal,
   slugify,
-  SocialGlyph,
   usePageTitle,
 } from "./shared";
 import { Footer, Header } from "./Chrome";
@@ -29,7 +28,7 @@ export default function About() {
 }
 
 function AboutContent() {
-  const { aboutContent } = useCms();
+  const { aboutContent, publishedClients } = useCms();
   return (
     <>
       {/* About Hero */}
@@ -91,33 +90,9 @@ function AboutContent() {
 
       {/* Clients */}
       <section className="about-clients">
-        <CMSClients />
+        <ClientTicker clients={publishedClients} heading="Our Clients" />
       </section>
     </>
-  );
-}
-
-function CMSClients() {
-  const { publishedClients } = useCms();
-  return (
-    <div className="container" {...reveal}>
-      <h3 className="about-clients-title">Our Clients</h3>
-      <div className="clients-carousel">
-        <button className="clients-arrow" aria-label="Previous" disabled>
-          <SocialGlyph paths={Icon.chevronLeft} />
-        </button>
-        <div className="clients-logos">
-          {publishedClients.map((c) => (
-            <div className="client-circle" key={c.id}>
-              <span>{c.name.slice(0, 2)}</span>
-            </div>
-          ))}
-        </div>
-        <button className="clients-arrow" aria-label="Next" disabled>
-          <SocialGlyph paths={Icon.chevronRight} />
-        </button>
-      </div>
-    </div>
   );
 }
 

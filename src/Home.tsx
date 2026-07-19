@@ -1,4 +1,5 @@
 import {
+  ClientTicker,
   delayStyle,
   reveal,
   usePageTitle,
@@ -23,7 +24,6 @@ export default function Home() {
 function HomeContent() {
   const { publishedClients, publishedProjects, landingContent, servicesContent } = useCms();
   const featuredProjects = publishedProjects.filter((p) => p.featured).slice(0, 3);
-  const cmsClients = publishedClients.map((c) => c.name);
   const visibleServices = servicesContent.services.filter((s) => s.visible).sort((a, b) => a.order - b.order);
   const [activeService, setActiveService] = useState<number | null>(null);
 
@@ -56,15 +56,11 @@ function HomeContent() {
       </section>
 
       {/* Logo strip */}
-      <section id="clients" className="logo-strip">
-        <div className="container" {...reveal}>
-          <p>{landingContent.clientStripHeading}</p>
-          <div className="logos">
-            {cmsClients.map((c) => (
-              <span key={c}>{c}</span>
-            ))}
-          </div>
-        </div>
+      <section id="clients">
+        <ClientTicker
+          clients={publishedClients}
+          heading={landingContent.clientStripHeading}
+        />
       </section>
 
       {/* Services */}

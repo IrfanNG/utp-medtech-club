@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { getClientLogoSrc } from "./clientLogos";
 
 /* ---------- Icons (line stroke) ---------- */
 export const Icon = {
@@ -144,6 +145,31 @@ export function SocialGlyph({ paths }: { paths: ReactNode }) {
   );
 }
 
+/* ---------- Client logo (image with graceful fallback) ---------- */
+export function ClientLogo({
+  src,
+  alt,
+  fallback,
+  className,
+}: {
+  src?: string;
+  alt: string;
+  fallback: ReactNode;
+  className?: string;
+}) {
+  const [errored, setErrored] = useState(false);
+  if (!src || errored) return <>{fallback}</>;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setErrored(true)}
+    />
+  );
+}
+
 /* ---------- Scroll reveal hook ---------- */
 export function useReveal(dep?: unknown) {
   useEffect(() => {
@@ -195,6 +221,79 @@ export function useReveal(dep?: unknown) {
 
 export const reveal = { "data-reveal": "" };
 export const delayStyle = (ms: number) => ({ "--delay": `${ms}ms` } as CSSProperties);
+
+/* ---------- Client Logo Ticker ---------- */
+export function ClientTicker({
+  clients,
+  heading,
+  className,
+}: {
+  clients: { id: string; name: string; logoMedia: string }[];
+  heading: string;
+  className?: string;
+}) {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
+  if (prefersReducedMotion) {
+    return (
+      <div className={`client-ticker reduced-motion ${className ?? ""}`}>
+        <h3 className="client-ticker-title">{heading}</h3>
+        <div className="client-ticker-track">
+          {clients.map((c) => (
+            <div className="client-ticker-item" key={c.id}>
+              <ClientLogo
+                src={getClientLogoSrc(c.name, c.logoMedia)}
+                alt={c.name}
+                className="client-logo-img"
+                fallback={<span>{c.name.slice(0, 2)}</span>}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`client-ticker ${className ?? ""}`}>
+      <h3 className="client-ticker-title">{heading}</h3>
+      <div className="client-ticker-lane">
+        <div className="client-ticker-track">
+          {clients.map((c) => (
+            <div className="client-ticker-item" key={`a-${c.id}`}>
+              <ClientLogo
+                src={getClientLogoSrc(c.name, c.logoMedia)}
+                alt={c.name}
+                className="client-logo-img"
+                fallback={<span>{c.name.slice(0, 2)}</span>}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="client-ticker-track">
+          {clients.map((c) => (
+            <div className="client-ticker-item" key={`b-${c.id}`}>
+              <ClientLogo
+                src={getClientLogoSrc(c.name, c.logoMedia)}
+                alt={c.name}
+                className="client-logo-img"
+                fallback={<span>{c.name.slice(0, 2)}</span>}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- Minimal hash router ---------- */
 export function useHashRoute() {
