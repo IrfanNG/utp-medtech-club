@@ -24,3 +24,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local data / sensitive assets
+sukmed-24/
+*.xlsx
