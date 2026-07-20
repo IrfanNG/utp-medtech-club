@@ -562,6 +562,7 @@ function mapSubmission(row: Row): ContactSubmission {
     hearAbout: (row.hear_about as string) ?? "",
     hearAboutOther: (row.hear_about_other as string) ?? "",
     referral: (row.referral as string) ?? "",
+    referralOwnerName: (row.referral_owner_name as string) ?? "",
     formData,
     attachmentPath: (row.attachment_path as string) ?? null,
     status: row.status as ContactSubmission["status"],

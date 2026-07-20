@@ -260,7 +260,11 @@ export function SubmissionsInbox() {
               )}
               <div className="adm-detail-field">
                 <label>Referral Code</label>
-                <span>{selected.referral || "—"}</span>
+                <span>
+                  {selected.referral
+                    ? `${selected.referral}${selected.referralOwnerName ? ` (${selected.referralOwnerName})` : ""}`
+                    : "—"}
+                </span>
               </div>
               {selected.attachmentPath && (
                 <div className="adm-detail-field">

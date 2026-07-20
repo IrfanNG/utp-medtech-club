@@ -126,6 +126,7 @@ export interface ContactSubmission {
   hearAbout: string;
   hearAboutOther: string;
   referral: string;
+  referralOwnerName: string;
   formData: Record<string, unknown>;
   attachmentPath: string | null;
   status: SubmissionStatus;

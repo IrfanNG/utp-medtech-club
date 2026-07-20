@@ -10,7 +10,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "reset:admin-password": "node scripts/reset-admin-password.mjs"
+    "reset:admin-password": "node scripts/reset-admin-password.mjs",
+    "import:referral-codes": "node scripts/import-referral-codes.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
@@ -28,6 +29,7 @@
     "supabase": "^2.108.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.0",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.0.0",
+    "xlsx": "^0.18.5"
   }
 }

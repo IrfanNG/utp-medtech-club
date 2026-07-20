@@ -362,6 +362,24 @@ export async function onRequest(context: {
     }
   }
 
+  // ---- Referral code validation (optional but enforced when populated) ----
+  let referralOwnerName = "";
+  if (payload.referral) {
+    const normalizedCode = payload.referral.trim().toLowerCase();
+    const refRes = await fetch(
+      `${supabaseUrl}/rest/v1/referral_codes?select=code,referrer_name,active&code=eq.${encodeURIComponent(normalizedCode)}&active=eq.true&limit=1`,
+      { headers: authHeaders },
+    );
+    if (!refRes.ok) {
+      return json({ error: "Failed to validate referral code" }, 502);
+    }
+    const matches = (await refRes.json()) as Array<{ code: string; referrer_name: string; active: boolean }>;
+    if (matches.length === 0) {
+      return json({ error: "Invalid referral code" }, 422);
+    }
+    referralOwnerName = matches[0].referrer_name;
+  }
+
   const ip = clientIp(context.request);
 
   // ---- Optional attachment upload (before insert so the row only stores a
@@ -395,6 +413,7 @@ export async function onRequest(context: {
       hear_about: payload.hearAbout,
       hear_about_other: payload.hearAboutOther,
       referral: payload.referral,
+      referral_owner_name: referralOwnerName,
       idempotency_key: payload.idempotencyKey,
       country_code: payload.countryCode,
       attachment_path: attachmentPath,
