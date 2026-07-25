@@ -6,9 +6,8 @@ import {
 } from "./shared";
 import { Footer, Header, SideRail } from "./Chrome";
 import { useCms } from "./cms/CmsContext";
-import { useEffect, useState } from "react";
-import type { ServiceCard } from "./cms/pageSchemas";
 import { FeaturedProjectCarousel3D } from "./components/FeaturedProjectCarousel3D";
+import { ServiceExpandCard } from "./components/ServiceExpandCard";
 
 export default function Home() {
   const { settings } = useCms();
@@ -26,10 +25,6 @@ function HomeContent() {
   const { publishedClients, publishedProjects, landingContent, servicesContent } = useCms();
   const featuredProjects = publishedProjects.filter((p) => p.featured).slice(0, 3);
   const visibleServices = servicesContent.services.filter((s) => s.visible).sort((a, b) => a.order - b.order);
-  const [activeService, setActiveService] = useState<number | null>(null);
-
-  const openService = (i: number) => setActiveService(i);
-  const closeService = () => setActiveService(null);
 
   return (
     <>
@@ -65,45 +60,20 @@ function HomeContent() {
       </section>
 
       {/* Services */}
-      <section id="services" className="section service-panels">
+      <section id="services" className="section">
         <div className="container">
           <div className="section-head" {...reveal}>
             <span className="eyebrow">{landingContent.servicesEyebrow}</span>
             <h2 className="section-title">{landingContent.servicesHeading}</h2>
           </div>
-          <div className="service-panels-list">
-            {visibleServices.map((s, i) => (
-              <div
-                className="service-panel"
-                key={s.title}
-                role="button"
-                tabIndex={0}
-                onClick={() => openService(i)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openService(i); } }}
-                {...reveal}
-                style={delayStyle(i * 100)}
-              >
-                <div className="panel-number">
-                  <span>{String(i + 1).padStart(2, "0")}</span>
-                </div>
-                <div className="panel-inner">
-                  <div className="panel-media">
-                    <div className="panel-img-main">
-                      <img src={s.images[0]} alt={s.alt} loading="lazy" className="card-img" />
-                    </div>
-                    <div className="panel-img-sec">
-                      <img src={s.images[1]} alt={s.alt} loading="lazy" className="card-img" />
-                    </div>
-                  </div>
-                  <div className="panel-body">
-                    <h3>{s.title}</h3>
-                    <p>{s.desc}</p>
-                    <span className="panel-learn-more">Learn more →</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ServiceExpandCard
+            services={visibleServices.map((s) => ({
+              title: s.title,
+              description: s.desc,
+              image: s.images[0],
+              alt: s.alt,
+            }))}
+          />
         </div>
       </section>
 
@@ -203,103 +173,6 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* Service detail modal */}
-      {activeService !== null && visibleServices[activeService] && (
-        <ServiceModal service={visibleServices[activeService]} onClose={closeService} />
-      )}
     </>
   );
-}
-
-/* ---------- Service Detail Modal ---------- */
-
-function ServiceModal({ service, onClose }: { service: ServiceCard; onClose: () => void }) {
-  useServiceModalEffects(onClose);
-
-  const detailTitle = service.detailTitle || service.title;
-  const detailBody = service.detailBody || service.desc;
-  const allImages = [...service.images, ...service.detailGallery].filter(Boolean);
-  const highlights = service.detailHighlights.filter(Boolean);
-
-  return (
-    <div className="service-modal-overlay" onClick={onClose}>
-      <div
-        className="service-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={detailTitle}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button className="service-modal-close" onClick={onClose} aria-label="Close dialog">
-          ×
-        </button>
-
-        <div className="service-modal-scroll">
-          {allImages.length > 0 && (
-            <div className="service-modal-media">
-              {allImages.slice(0, 3).map((img, i) => (
-                <div className="service-modal-img-wrap" key={i}>
-                  <img src={img} alt={`${detailTitle} — image ${i + 1}`} loading="lazy" className="card-img" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="service-modal-body">
-            <span className="eyebrow">Service</span>
-            <h2>{detailTitle}</h2>
-
-            <div className="service-modal-desc">
-              {detailBody.split("\n").map((line, i) => (
-                <p key={i}>{line}</p>
-              ))}
-            </div>
-
-            {highlights.length > 0 && (
-              <ul className="service-modal-highlights">
-                {highlights.map((h, i) => (
-                  <li key={i}>
-                    <span className="service-modal-bullet">▸</span>
-                    {h}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {service.detailVideo && (
-              <div className="service-modal-video">
-                <a href={service.detailVideo} target="_blank" rel="noreferrer" className="service-modal-video-link">
-                  <span className="service-modal-video-play">▷</span>
-                  Watch Video
-                </a>
-              </div>
-            )}
-
-            {service.detailCta && (
-              <div className="service-modal-actions">
-                <a href="#/contact" className="btn btn-primary" onClick={onClose}>
-                  {service.detailCta} <span className="btn-arrow">→</span>
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function useServiceModalEffects(onClose: () => void) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
 }
